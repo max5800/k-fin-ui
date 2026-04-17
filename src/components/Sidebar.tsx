@@ -33,9 +33,6 @@ export default function Sidebar() {
     <aside className="h-screen w-64 fixed left-0 top-0 border-r border-white/10 bg-surface-container-low flex flex-col py-8 px-4 font-headline antialiased z-50">
       <div className="mb-10 px-4">
         <h1 className="text-2xl font-bold tracking-tighter text-primary uppercase">k-fin</h1>
-        <p className="text-[10px] text-on-surface-variant/60 font-medium tracking-widest uppercase mt-1">
-          Klaus Finanzen
-        </p>
       </div>
 
       <nav className="flex-1 space-y-1">

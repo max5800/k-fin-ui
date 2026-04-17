@@ -1,6 +1,6 @@
 # k-fin UI
 
-Frontend für k-fin (Klaus Finanzen) — React 19 + TypeScript + Vite.
+Frontend für k-fin — React 19 + TypeScript + Vite.
 
 ## Stack
 

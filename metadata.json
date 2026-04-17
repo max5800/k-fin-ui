@@ -1,6 +1,6 @@
 {
   "name": "k-fin-ui",
-  "description": "Frontend für k-fin (Klaus Finanzen) — persönliches Finanz-Dashboard mit AI-Agents.",
+  "description": "Frontend für k-fin — persönliches Finanz-Dashboard mit AI-Agents.",
   "requestFramePermissions": [],
   "majorCapabilities": []
 }
