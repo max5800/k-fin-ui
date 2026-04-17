@@ -9,6 +9,12 @@ export default defineConfig(({ mode }) => {
   const hmrClientPort = env.VITE_HMR_CLIENT_PORT
     ? Number(env.VITE_HMR_CLIENT_PORT)
     : undefined;
+  // Vite v6 blocks unknown Host headers. When served through an Ingress the
+  // host isn't localhost, so we have to allow it explicitly. Comma-separated
+  // list; defaults cover local dev.
+  const allowedHosts = env.VITE_ALLOWED_HOSTS
+    ? env.VITE_ALLOWED_HOSTS.split(',').map((h) => h.trim()).filter(Boolean)
+    : ['localhost', '127.0.0.1'];
 
   return {
     plugins: [react(), tailwindcss()],
@@ -20,6 +26,7 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '0.0.0.0',
       port: 3000,
+      allowedHosts,
       proxy: {
         '/api': {
           target: apiProxyTarget,
