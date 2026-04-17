@@ -1,0 +1,15 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Install deps first so dependency changes invalidate the cache independently
+# from source changes.
+COPY package.json package-lock.json ./
+RUN npm ci --no-audit --no-fund
+
+# Source is copied in the initial build; Tilt live_update replaces these at runtime.
+COPY . .
+
+EXPOSE 3000
+
+CMD ["npm", "run", "dev"]
