@@ -149,3 +149,83 @@ export type PaginatedResponse<T> = {
   limit: number;
   offset: number;
 };
+
+// ── Portfolio / Depot ──────────────────────────────────────────
+
+export type Depot = {
+  depot_id: string;
+  depot_type: string | null;
+  currency: string;
+  total_value: number;
+  total_purchase_value: number;
+  total_pnl_abs: number;
+  total_pnl_rel: number;
+  positions_count: number;
+  last_synced_at: string | null;
+};
+
+export type Instrument = {
+  isin: string;
+  wkn: string | null;
+  name: string;
+  instrument_type: string | null;
+  currency: string;
+};
+
+export type Position = {
+  depot_id: string;
+  instrument: Instrument;
+  quantity: number;
+  current_price: number;
+  current_value: number;
+  purchase_value: number;
+  prev_day_price: number | null;
+  daily_pnl_abs: number;
+  daily_pnl_rel: number;
+  total_pnl_abs: number;
+  total_pnl_rel: number;
+  weight_pct: number;
+  currency: string;
+  as_of: string;
+};
+
+export type DepotTransactionType = 'BUY' | 'SELL' | 'DIVIDEND' | 'OTHER';
+
+export type DepotTransaction = {
+  transaction_id: string;
+  depot_id: string;
+  isin: string | null;
+  booking_date: string;
+  transaction_type: DepotTransactionType;
+  quantity: number;
+  price: number;
+  amount: number;
+  currency: string;
+};
+
+export type PortfolioSummary = {
+  total_value: number;
+  total_purchase_value: number;
+  total_pnl_abs: number;
+  total_pnl_rel: number;
+  daily_pnl_abs: number;
+  daily_pnl_rel: number;
+  dividend_yield_pct: number;
+  positions_count: number;
+  depots_count: number;
+  last_synced_at: string | null;
+};
+
+export type AllocationBucket = {
+  bucket: string;
+  value: number;
+  share_pct: number;
+};
+
+export type PerformancePoint = {
+  snapshot_date: string;
+  total_value: number;
+  total_purchase_value: number;
+};
+
+export type PerformanceRange = '1D' | '1W' | '1M' | '1Y' | 'MAX';

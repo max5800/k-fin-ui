@@ -47,4 +47,12 @@ export const qk = {
   categorization: {
     pending: ['categorization', 'pending'] as const,
   },
+  portfolio: {
+    summary: ['portfolio', 'summary'] as const,
+    allocation: ['portfolio', 'allocation'] as const,
+    performance: (range: string) => ['portfolio', 'performance', range] as const,
+    depots: ['portfolio', 'depots'] as const,
+    positions: (depotId: string | null) =>
+      ['portfolio', 'positions', depotId] as const,
+  },
 } as const;

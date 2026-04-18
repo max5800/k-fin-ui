@@ -1,6 +1,7 @@
 import {
   LayoutGrid,
   ReceiptText,
+  TrendingUp,
   Wallet,
   FileText,
   HelpCircle,
@@ -21,6 +22,7 @@ export default function Sidebar() {
   const menuItems = [
     { to: '/', label: 'Dashboard', icon: LayoutGrid, end: true },
     { to: '/transactions', label: 'Transaktionen', icon: ReceiptText },
+    { to: '/portfolio', label: 'Portfolio', icon: TrendingUp },
     { to: '/budgets', label: 'Budgets', icon: Wallet },
     { to: '/agents', label: 'Agents', icon: Sparkles },
     { to: '/review', label: 'Review', icon: HelpCircle, badge: pendingCount },

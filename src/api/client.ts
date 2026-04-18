@@ -24,6 +24,23 @@ const DECIMAL_FIELDS = new Set([
   'savings_rate',
   'monthly_limit',
   'total',
+  // portfolio
+  'total_value',
+  'total_purchase_value',
+  'total_pnl_abs',
+  'total_pnl_rel',
+  'daily_pnl_abs',
+  'daily_pnl_rel',
+  'dividend_yield_pct',
+  'weight_pct',
+  'share_pct',
+  'current_price',
+  'current_value',
+  'purchase_value',
+  'prev_day_price',
+  'quantity',
+  'price',
+  'value',
 ]);
 
 function parseDecimals(data: unknown): unknown {

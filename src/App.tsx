@@ -11,6 +11,7 @@ import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import Onboarding from './components/Onboarding';
 import PendingReview from './components/PendingReview';
+import Portfolio from './components/Portfolio';
 import Reports from './components/Reports';
 import Settings from './components/Settings';
 import Transactions from './components/Transactions';
@@ -58,6 +59,7 @@ export default function App() {
               <Route element={<MainLayout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="transactions" element={<Transactions />} />
+                <Route path="portfolio" element={<Portfolio />} />
                 <Route path="budgets" element={<Budgets />} />
                 <Route path="agents" element={<AgentRuns />} />
                 <Route path="review" element={<PendingReview />} />
