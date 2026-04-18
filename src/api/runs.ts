@@ -16,7 +16,7 @@ export function useRuns(filters: RunFilters) {
     refetchInterval: (query) => {
       const data = query.state.data as PaginatedResponse<Run> | undefined;
       const hasActiveRuns = data?.items.some(
-        run => run.status === 'PENDING' || run.status === 'RUNNING'
+        run => run.status === 'pending' || run.status === 'running'
       );
       return hasActiveRuns ? 5000 : false;
     },
@@ -33,7 +33,7 @@ export function useRun(id: string) {
     enabled: !!id,
     refetchInterval: (query) => {
       const run = query.state.data as Run | undefined;
-      return run?.status === 'PENDING' || run?.status === 'RUNNING' ? 5000 : false;
+      return run?.status === 'pending' || run?.status === 'running' ? 5000 : false;
     }
   });
 }

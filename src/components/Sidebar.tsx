@@ -3,22 +3,27 @@ import {
   ReceiptText,
   Wallet,
   FileText,
+  HelpCircle,
   Sparkles,
   Settings as SettingsIcon,
   LogOut,
 } from 'lucide-react';
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
+import { usePendingSuggestions } from '../api/categorization';
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const { data: pending } = usePendingSuggestions();
+  const pendingCount = pending?.items.length ?? 0;
 
   const menuItems = [
     { to: '/', label: 'Dashboard', icon: LayoutGrid, end: true },
     { to: '/transactions', label: 'Transaktionen', icon: ReceiptText },
     { to: '/budgets', label: 'Budgets', icon: Wallet },
     { to: '/agents', label: 'Agents', icon: Sparkles },
+    { to: '/review', label: 'Review', icon: HelpCircle, badge: pendingCount },
     { to: '/reports', label: 'Reports', icon: FileText },
     { to: '/settings', label: 'Einstellungen', icon: SettingsIcon },
   ];
@@ -52,7 +57,12 @@ export default function Sidebar() {
               }
             >
               <Icon className="w-5 h-5" />
-              <span className="text-sm">{item.label}</span>
+              <span className="text-sm flex-1">{item.label}</span>
+              {item.badge && item.badge > 0 ? (
+                <span className="text-[10px] font-bold bg-primary/20 text-primary px-2 py-0.5 rounded-full tabular-nums">
+                  {item.badge}
+                </span>
+              ) : null}
             </NavLink>
           );
         })}

@@ -1,5 +1,4 @@
 import { Outlet, useLocation } from 'react-router-dom';
-import { AnimatePresence, motion } from 'motion/react';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
 
@@ -16,25 +15,22 @@ export default function MainLayout() {
   const location = useLocation();
   const viewData = VIEW_TITLES[location.pathname];
 
+  // NOTE: Route-level AnimatePresence with motion.div keyed on location.pathname
+  // was removed because it remounted the active route whenever a descendant
+  // component rendered a nested <AnimatePresence> (e.g. the confirm modal in
+  // AgentRuns). That unmount propagated through the portal and closed the
+  // modal ~200ms after it opened, breaking single-click flows. The route
+  // tree is now rendered as a plain <Outlet /> — route changes still re-key
+  // via React Router's internal matching, without the fragile fade-through.
   return (
     <div className="min-h-screen bg-background text-on-surface font-sans antialiased overflow-hidden">
       <Sidebar />
 
       <main className="pl-64 min-h-screen">
         <TopBar title={viewData?.title} subtitle={viewData?.subtitle} />
-
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={location.pathname}
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="h-full"
-          >
-            <Outlet />
-          </motion.div>
-        </AnimatePresence>
+        <div className="h-full">
+          <Outlet />
+        </div>
       </main>
     </div>
   );

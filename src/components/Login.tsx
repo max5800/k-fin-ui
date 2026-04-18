@@ -5,6 +5,8 @@ import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { isAxiosError } from 'axios';
+import { useLogin } from '../api/auth';
 
 const loginSchema = z.object({
   email: z.string().email('Gültige E-Mail erforderlich'),
@@ -15,7 +17,8 @@ type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const navigate = useNavigate();
-  const [isConnecting, setIsConnecting] = useState(false);
+  const login = useLogin();
+  const [authError, setAuthError] = useState<string | null>(null);
 
   const {
     register,
@@ -25,15 +28,24 @@ export default function Login() {
     resolver: zodResolver(loginSchema),
   });
 
-  const onSubmit = (data: LoginFormData) => {
-    setIsConnecting(true);
-    // TODO: echten Auth-Endpoint anbinden sobald Backend steht
-    setTimeout(() => {
-      localStorage.setItem('kfin_token', 'mock_' + btoa(data.email));
-      setIsConnecting(false);
+  const onSubmit = async (data: LoginFormData) => {
+    setAuthError(null);
+    try {
+      const res = await login.mutateAsync(data);
+      localStorage.setItem('kfin_token', res.access_token);
       navigate('/');
-    }, 800);
+    } catch (err) {
+      if (isAxiosError(err) && err.response?.status === 401) {
+        setAuthError('E-Mail oder Passwort ungültig');
+      } else if (isAxiosError(err) && err.response?.status === 404) {
+        setAuthError('Anmeldung am Server nicht verfügbar');
+      } else {
+        setAuthError('Anmeldung fehlgeschlagen. Bitte erneut versuchen.');
+      }
+    }
   };
+
+  const isConnecting = login.isPending;
 
   return (
     <div className="min-h-screen bg-background flex items-center justify-center p-6 relative overflow-hidden font-headline">
@@ -92,6 +104,12 @@ export default function Login() {
               Passwort vergessen?
             </button>
           </div>
+
+          {authError && (
+            <p className="text-xs text-error font-bold text-center" role="alert">
+              {authError}
+            </p>
+          )}
 
           <button
             type="submit"

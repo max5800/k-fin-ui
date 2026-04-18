@@ -3,27 +3,37 @@ import {
   Calendar,
   CalendarRange,
   CheckCircle2,
+  ChevronDown,
+  ChevronRight,
   Loader2,
+  Play,
   Sparkles,
   Tag,
+  X,
   XCircle,
   Zap,
 } from 'lucide-react';
-import { motion } from 'motion/react';
-import type { ComponentType } from 'react';
+import { AnimatePresence, motion } from 'motion/react';
+import { useEffect, useState, type ComponentType } from 'react';
+import { createPortal } from 'react-dom';
 import {
   useRuns,
   useTriggerFullPipeline,
   useTriggerRun,
 } from '../api/runs';
 import { formatDate } from '../lib/format';
-import type { AgentName, RunStatus } from '../api/types';
+import type { AgentName, Run, RunStatus } from '../api/types';
+
+type PendingTrigger =
+  | { kind: 'full' }
+  | { kind: 'single'; agent: AgentMeta };
 
 type AgentMeta = {
   id: AgentName;
   name: string;
   desc: string;
   icon: ComponentType<{ className?: string }>;
+  model: string;
 };
 
 const AGENTS: AgentMeta[] = [
@@ -32,46 +42,85 @@ const AGENTS: AgentMeta[] = [
     name: 'Kategorisierung',
     desc: 'Ordnet Transaktionen automatisch Kategorien zu',
     icon: Tag,
+    model: 'Sonnet 4.6',
   },
   {
     id: 'weekly_analysis',
     name: 'Wochenanalyse',
     desc: 'Wöchentliche Auswertung & Trends',
     icon: CalendarRange,
+    model: 'Sonnet 4',
   },
   {
     id: 'monthly_analysis',
     name: 'Monatsanalyse',
     desc: 'Monatsbericht & Kategorien-Breakdown',
     icon: Calendar,
+    model: 'Sonnet 4',
   },
   {
     id: 'anomaly',
     name: 'Anomalie-Erkennung',
     desc: 'Findet ungewöhnliche Ausgaben & Muster',
     icon: AlertTriangle,
+    model: 'Sonnet 4',
   },
   {
     id: 'synthesis',
     name: 'Synthese',
     desc: 'Aggregiert Ergebnisse zu einer Gesamtschau',
     icon: Sparkles,
+    model: 'Sonnet 4',
   },
 ];
 
 const STATUS_STYLES: Record<RunStatus, string> = {
-  SUCCEEDED: 'bg-secondary/10 text-secondary border-secondary/30',
-  RUNNING: 'bg-primary/10 text-primary border-primary/30',
-  PENDING: 'bg-surface-container-high text-on-surface-variant border-white/10',
-  FAILED: 'bg-error/10 text-error border-error/30',
+  succeeded: 'bg-secondary/10 text-secondary border-secondary/30',
+  running: 'bg-primary/10 text-primary border-primary/30',
+  pending: 'bg-surface-container-high text-on-surface-variant border-white/10',
+  failed: 'bg-error/10 text-error border-error/30',
 };
 
 const STATUS_LABEL: Record<RunStatus, string> = {
-  SUCCEEDED: 'Erfolgreich',
-  RUNNING: 'Läuft',
-  PENDING: 'Wartet',
-  FAILED: 'Fehlgeschlagen',
+  succeeded: 'Erfolgreich',
+  running: 'Läuft',
+  pending: 'Wartet',
+  failed: 'Fehlgeschlagen',
 };
+
+const FALLBACK_STYLE = 'bg-surface-container-high text-on-surface-variant border-white/10';
+
+function formatDuration(seconds: number): string {
+  if (seconds < 0) return '0:00';
+  const m = Math.floor(seconds / 60);
+  const s = Math.floor(seconds % 60);
+  return `${m}:${s.toString().padStart(2, '0')}`;
+}
+
+function useElapsed(startedAt: string | null, active: boolean): number {
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (!active) return;
+    const id = setInterval(() => setNow(Date.now()), 1000);
+    return () => clearInterval(id);
+  }, [active]);
+  if (!startedAt) return 0;
+  return Math.max(0, Math.floor((now - Date.parse(startedAt)) / 1000));
+}
+
+function estimatedSeconds(runs: Run[] | undefined, agent: string): number | null {
+  if (!runs) return null;
+  const finished = runs
+    .filter((r) => r.agent_name === agent && r.status === 'succeeded' && r.finished_at)
+    .slice(0, 5);
+  if (finished.length === 0) return null;
+  const total = finished.reduce(
+    (s, r) =>
+      s + (Date.parse(r.finished_at!) - Date.parse(r.started_at)) / 1000,
+    0,
+  );
+  return Math.round(total / finished.length);
+}
 
 export default function AgentRuns() {
   const { data: runsData, isPending: isHistoryPending } = useRuns({ limit: 20 });
@@ -79,9 +128,38 @@ export default function AgentRuns() {
     useTriggerRun();
   const { mutate: triggerFull, isPending: isTriggeringFull } = useTriggerFullPipeline();
 
-  const hasActiveRun = runsData?.items.some(
-    (r) => r.status === 'PENDING' || r.status === 'RUNNING',
+  const [pending, setPending] = useState<PendingTrigger | null>(null);
+  const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
+  const toggleExpand = (id: string) => {
+    setExpandedRuns((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const activeRun = runsData?.items.find(
+    (r) => r.status === 'pending' || r.status === 'running',
   );
+  const hasActiveRun = !!activeRun;
+  const activeElapsed = useElapsed(activeRun?.started_at ?? null, hasActiveRun);
+  const activeEstimate = activeRun
+    ? estimatedSeconds(runsData?.items, activeRun.agent_name)
+    : null;
+  const activeRemaining =
+    activeEstimate !== null ? Math.max(0, activeEstimate - activeElapsed) : null;
+
+  const isAnyTriggering = isTriggering || isTriggeringFull;
+
+  const confirmRun = () => {
+    if (!pending) return;
+    if (pending.kind === 'full') {
+      triggerFull(undefined, { onSettled: () => setPending(null) });
+    } else {
+      triggerRun(pending.agent.id, { onSettled: () => setPending(null) });
+    }
+  };
 
   return (
     <div className="pt-24 px-8 pb-12 overflow-y-auto h-screen">
@@ -92,35 +170,59 @@ export default function AgentRuns() {
           </h3>
           <h1 className="font-headline text-3xl font-extrabold tracking-tight">Agents</h1>
         </div>
-        {hasActiveRun && (
-          <div className="flex items-center gap-2 bg-surface-container-low px-4 py-2 rounded-full border border-primary/20">
+        {hasActiveRun && activeRun && (
+          <div className="flex items-center gap-3 bg-surface-container-low px-4 py-2 rounded-full border border-primary/20">
             <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs font-medium text-on-surface-variant uppercase tracking-widest">
-              Auto-Refresh aktiv (5s)
+            <span className="text-xs font-bold text-on-surface tabular-nums">
+              {formatDuration(activeElapsed)}
+              {activeEstimate !== null && (
+                <span className="text-on-surface-variant font-normal">
+                  {' '}/ ≈ {formatDuration(activeEstimate)}
+                  {activeRemaining !== null && activeRemaining > 0 && (
+                    <span> · noch {formatDuration(activeRemaining)}</span>
+                  )}
+                </span>
+              )}
             </span>
+            {activeRun.progress_total ? (
+              <span className="text-xs font-medium text-on-surface-variant tabular-nums">
+                · {activeRun.progress_current ?? 0}/{activeRun.progress_total}
+              </span>
+            ) : null}
           </div>
         )}
       </div>
 
       <div className="grid grid-cols-12 gap-6 mb-12">
         <div className="col-span-12 lg:col-span-4">
-          <button
-            onClick={() => triggerFull()}
-            disabled={isTriggeringFull || isTriggering}
-            className="w-full h-full flex flex-col justify-center items-center p-8 bg-surface-container-highest rounded-2xl border-2 border-secondary relative overflow-hidden group transition-all hover:shadow-[0_0_40px_rgba(244,189,95,0.1)] disabled:opacity-50"
-          >
-            {isTriggeringFull ? (
-              <Loader2 className="w-12 h-12 text-secondary mb-4 animate-spin" />
-            ) : (
-              <Zap className="w-12 h-12 text-secondary mb-4 fill-secondary" />
-            )}
-            <span className="font-headline text-2xl font-extrabold text-secondary tracking-tight">
-              Full Pipeline
-            </span>
-            <p className="text-sm text-on-surface-variant mt-2 text-center max-w-[220px]">
-              Führt alle 5 Agents nacheinander aus
-            </p>
-          </button>
+          <div className="w-full h-full flex flex-col justify-between p-8 bg-surface-container-highest rounded-2xl border-2 border-secondary relative overflow-hidden group transition-all hover:shadow-[0_0_40px_rgba(244,189,95,0.1)]">
+            <div className="flex flex-col items-center flex-1 justify-center">
+              {isTriggeringFull ? (
+                <Loader2 className="w-12 h-12 text-secondary mb-4 animate-spin" />
+              ) : (
+                <Zap className="w-12 h-12 text-secondary mb-4 fill-secondary" />
+              )}
+              <span className="font-headline text-2xl font-extrabold text-secondary tracking-tight">
+                Full Pipeline
+              </span>
+              <p className="text-sm text-on-surface-variant mt-2 text-center max-w-[220px]">
+                Führt alle 5 Agents nacheinander aus
+              </p>
+            </div>
+            <div className="flex items-center justify-between pt-6 border-t border-white/5 mt-6">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70 font-mono">
+                Sonnet 4.6 + 4
+              </span>
+              <button
+                onClick={() => setPending({ kind: 'full' })}
+                disabled={isAnyTriggering || hasActiveRun}
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-md bg-secondary text-on-secondary hover:brightness-110 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <Play className="w-3 h-3 fill-on-secondary" />
+                Run
+              </button>
+            </div>
+          </div>
         </div>
 
         <div className="col-span-12 lg:col-span-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -128,11 +230,9 @@ export default function AgentRuns() {
             const Icon = agent.icon;
             const isThisTriggering = isTriggering && triggeringAgent === agent.id;
             return (
-              <button
+              <div
                 key={agent.id}
-                onClick={() => triggerRun(agent.id)}
-                disabled={isTriggering || isTriggeringFull}
-                className="flex flex-col p-5 bg-surface-container rounded-xl border border-white/5 hover:bg-surface-container-high hover:-translate-y-0.5 transition-all text-left disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex flex-col p-5 bg-surface-container rounded-xl border border-white/5 transition-all"
               >
                 <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center mb-4 text-primary">
                   {isThisTriggering ? (
@@ -142,10 +242,23 @@ export default function AgentRuns() {
                   )}
                 </div>
                 <span className="font-bold text-on-surface mb-1">{agent.name}</span>
-                <span className="text-xs text-on-surface-variant leading-relaxed">
+                <span className="text-xs text-on-surface-variant leading-relaxed mb-4">
                   {agent.desc}
                 </span>
-              </button>
+                <div className="mt-auto flex items-center justify-between pt-3 border-t border-white/5">
+                  <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant/70 font-mono" title={`Model: ${agent.model}`}>
+                    {agent.model}
+                  </span>
+                  <button
+                    onClick={() => setPending({ kind: 'single', agent })}
+                    disabled={isAnyTriggering || hasActiveRun}
+                    className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-1.5 rounded-md bg-primary/10 text-primary hover:bg-primary/20 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                  >
+                    <Play className="w-3 h-3 fill-primary" />
+                    Run
+                  </button>
+                </div>
+              </div>
             );
           })}
         </div>
@@ -159,6 +272,7 @@ export default function AgentRuns() {
           <table className="w-full text-left">
             <thead>
               <tr className="text-on-surface-variant text-[11px] uppercase tracking-widest font-bold bg-surface-container/50">
+                <th className="w-10 px-2 py-4"></th>
                 <th className="px-6 py-4">Agent</th>
                 <th className="px-6 py-4">Trigger</th>
                 <th className="px-6 py-4">Gestartet</th>
@@ -170,7 +284,7 @@ export default function AgentRuns() {
               {isHistoryPending ? (
                 Array.from({ length: 5 }).map((_, i) => (
                   <tr key={i} className="animate-pulse">
-                    <td colSpan={5} className="px-6 py-4">
+                    <td colSpan={6} className="px-6 py-4">
                       <div className="h-8 bg-white/5 rounded w-full" />
                     </td>
                   </tr>
@@ -178,62 +292,343 @@ export default function AgentRuns() {
               ) : runsData?.items.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={6}
                     className="text-center py-16 text-on-surface-variant text-sm"
                   >
                     Noch keine Runs — starte oben einen Agent
                   </td>
                 </tr>
               ) : (
-                runsData?.items.map((run) => {
-                  const status = run.status as RunStatus;
-                  const duration =
-                    run.finished_at && run.started_at
-                      ? Math.round(
-                          (new Date(run.finished_at).getTime() -
-                            new Date(run.started_at).getTime()) /
-                            1000,
-                        )
-                      : null;
-                  return (
-                    <tr
-                      key={run.id}
-                      className="hover:bg-surface-container/30 transition-colors"
-                    >
-                      <td className="px-6 py-4">
-                        <span className="font-bold text-on-surface text-sm">
-                          {run.agent_name}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm text-on-surface-variant">
-                        {run.trigger}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-on-surface-variant tabular-nums">
-                        {formatDate(run.started_at, 'dd.MM.yyyy HH:mm')}
-                      </td>
-                      <td className="px-6 py-4 text-sm text-on-surface-variant tabular-nums">
-                        {duration !== null ? `${duration}s` : '—'}
-                      </td>
-                      <td className="px-6 py-4 text-right">
-                        <span
-                          className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase border ${STATUS_STYLES[status]}`}
-                        >
-                          {status === 'RUNNING' && (
-                            <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
-                          )}
-                          {status === 'SUCCEEDED' && <CheckCircle2 className="w-3 h-3" />}
-                          {status === 'FAILED' && <XCircle className="w-3 h-3" />}
-                          {STATUS_LABEL[status]}
-                        </span>
-                      </td>
-                    </tr>
-                  );
-                })
+                runsData?.items.map((run) => (
+                  <RunRow
+                    key={run.id}
+                    run={run}
+                    estimate={estimatedSeconds(runsData?.items, run.agent_name)}
+                    expanded={expandedRuns.has(run.id)}
+                    onToggleExpand={() => toggleExpand(run.id)}
+                  />
+                ))
               )}
             </tbody>
           </table>
         </div>
       </section>
+
+      {createPortal(
+        <AnimatePresence>
+        {pending && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+            onClick={isAnyTriggering ? undefined : () => setPending(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md bg-surface-container-low border border-white/5 rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+                    {pending.kind === 'full' ? (
+                      <Zap className="w-5 h-5" />
+                    ) : (
+                      <pending.agent.icon className="w-5 h-5" />
+                    )}
+                  </div>
+                  <div>
+                    <h3 className="font-headline font-bold text-on-surface">
+                      {pending.kind === 'full'
+                        ? 'Full Pipeline starten?'
+                        : `${pending.agent.name} starten?`}
+                    </h3>
+                    <p className="text-xs text-on-surface-variant">
+                      LLM-Aufrufe können kostenpflichtig sein
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setPending(null)}
+                  disabled={isAnyTriggering}
+                  className="text-on-surface-variant hover:text-on-surface disabled:opacity-30"
+                  aria-label="Schließen"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
+                {pending.kind === 'full'
+                  ? 'Es werden alle 5 Agents nacheinander ausgeführt. Dies dauert etwa 30–60 Sekunden und löst mehrere LLM-Anfragen aus.'
+                  : pending.agent.desc}
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setPending(null)}
+                  disabled={isAnyTriggering}
+                  className="flex-1 bg-surface-container-high hover:bg-surface-container-highest py-3 rounded-xl text-sm font-bold text-on-surface transition-all disabled:opacity-50"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={confirmRun}
+                  disabled={isAnyTriggering}
+                  className="flex-1 bg-primary text-on-primary py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-all disabled:opacity-50"
+                >
+                  {isAnyTriggering ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Starte...
+                    </>
+                  ) : (
+                    'Ja, starten'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+        </AnimatePresence>,
+        document.body,
+      )}
     </div>
+  );
+}
+
+// Short model labels — backend stores full IDs like
+// "anthropic:claude-haiku-4-5-20251001"; the UI only needs the family + version.
+const MODEL_LABEL: Record<string, string> = {
+  'anthropic:claude-haiku-4-5-20251001': 'Haiku 4.5',
+  'anthropic:claude-haiku-4-5': 'Haiku 4.5',
+  'anthropic:claude-sonnet-4-20250514': 'Sonnet 4',
+  'anthropic:claude-sonnet-4-5-20250929': 'Sonnet 4.5',
+  'anthropic:claude-sonnet-4-5': 'Sonnet 4.5',
+  'anthropic:claude-sonnet-4-6': 'Sonnet 4.6',
+  'anthropic:claude-opus-4-7': 'Opus 4.7',
+};
+
+const AGENT_LABEL: Record<string, string> = {
+  categorization: 'Kategorisierung',
+  weekly_analysis: 'Wochenanalyse',
+  monthly_analysis: 'Monatsanalyse',
+  anomaly: 'Anomalie-Erkennung',
+  synthesis: 'Synthese',
+};
+
+function formatTokens(n: number): string {
+  if (n >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `${(n / 1_000).toFixed(n >= 10_000 ? 0 : 1)}k`;
+  return `${n}`;
+}
+
+function formatCost(usd: string | null | undefined): string {
+  if (usd === null || usd === undefined || usd === '') return '—';
+  const n = parseFloat(usd);
+  if (Number.isNaN(n)) return '—';
+  if (n === 0) return '$0';
+  if (n < 0.01) return '< $0.01';
+  return `$${n.toFixed(n < 1 ? 2 : 2)}`;
+}
+
+function RunRow({
+  run,
+  estimate,
+  expanded,
+  onToggleExpand,
+}: {
+  run: Run;
+  estimate: number | null;
+  expanded: boolean;
+  onToggleExpand: () => void;
+  key?: string;
+}) {
+  const status = run.status as RunStatus;
+  const isActive = status === 'running' || status === 'pending';
+  const styleClass = STATUS_STYLES[status] ?? FALLBACK_STYLE;
+  const label = STATUS_LABEL[status] ?? status;
+
+  const elapsed = useElapsed(run.started_at, isActive);
+
+  const finalDuration =
+    run.finished_at && run.started_at
+      ? Math.round(
+          (Date.parse(run.finished_at) - Date.parse(run.started_at)) / 1000,
+        )
+      : null;
+
+  const durationText = isActive
+    ? `${formatDuration(elapsed)}${estimate !== null ? ` / ≈ ${formatDuration(estimate)}` : ''}`
+    : finalDuration !== null
+      ? `${finalDuration}s`
+      : '—';
+
+  const progress = (() => {
+    const cur = run.progress_current;
+    const tot = run.progress_total;
+    if (cur == null || tot == null || tot === 0) return null;
+    return { current: cur, total: tot, pct: Math.min(100, Math.round((cur / tot) * 100)) };
+  })();
+
+  // Expandable when the run has something interesting to show —
+  // a usage breakdown, aggregate tokens, or at least a cost field.
+  const hasUsageData =
+    run.usage_detail != null ||
+    run.input_tokens != null ||
+    run.output_tokens != null ||
+    run.cost_usd != null;
+  const canExpand = !isActive && hasUsageData;
+
+  const usageEntries = run.usage_detail
+    ? Object.entries(run.usage_detail)
+    : [];
+
+  return (
+    <>
+      <tr
+        className={`hover:bg-surface-container/30 transition-colors ${canExpand ? 'cursor-pointer' : ''}`}
+        onClick={canExpand ? onToggleExpand : undefined}
+      >
+        <td className="w-10 px-2 py-4 align-middle">
+          {canExpand && (
+            <span className="inline-flex items-center justify-center w-6 h-6 rounded-md hover:bg-white/5 text-on-surface-variant">
+              {expanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+            </span>
+          )}
+        </td>
+        <td className="px-6 py-4">
+          <span className="font-bold text-on-surface text-sm">{run.agent_name}</span>
+        </td>
+        <td className="px-6 py-4 text-sm text-on-surface-variant">{run.trigger}</td>
+        <td className="px-6 py-4 text-sm text-on-surface-variant tabular-nums">
+          {formatDate(run.started_at, 'dd.MM.yyyy HH:mm')}
+        </td>
+        <td className="px-6 py-4 text-sm text-on-surface-variant tabular-nums">
+          {durationText}
+        </td>
+        <td className="px-6 py-4 text-right">
+          <span
+            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase border ${styleClass}`}
+            title={run.error ?? undefined}
+          >
+            {status === 'running' && (
+              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+            )}
+            {status === 'succeeded' && <CheckCircle2 className="w-3 h-3" />}
+            {status === 'failed' && <XCircle className="w-3 h-3" />}
+            {label}
+          </span>
+        </td>
+      </tr>
+      {status === 'failed' && run.error && (
+        <tr className="bg-error/5 border-l-2 border-error">
+          <td colSpan={6} className="px-6 pb-4 pt-0">
+            <div className="flex items-start gap-2 text-xs text-error">
+              <XCircle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <div className="flex-1 space-y-1">
+                {run.error.split(' | ').map((line, i) => (
+                  <p key={i} className="leading-relaxed">
+                    {line}
+                  </p>
+                ))}
+              </div>
+            </div>
+          </td>
+        </tr>
+      )}
+      {isActive && (run.progress_message || progress) && (
+        <tr className="bg-surface-container/10">
+          <td colSpan={6} className="px-6 pb-4 pt-0">
+            {progress && (
+              <div className="mb-2 h-1.5 w-full bg-primary/10 rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary transition-all duration-500"
+                  style={{ width: `${progress.pct}%` }}
+                />
+              </div>
+            )}
+            <div className="flex items-center justify-between text-[11px] text-on-surface-variant">
+              <span>{run.progress_message ?? 'läuft…'}</span>
+              {progress && (
+                <span className="tabular-nums font-bold text-on-surface">
+                  {progress.current}/{progress.total} ({progress.pct}%)
+                </span>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+      {expanded && canExpand && (
+        <tr className="bg-surface-container/20">
+          <td colSpan={6} className="px-6 py-4">
+            <div className="space-y-3">
+              <h4 className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                Modellnutzung
+              </h4>
+              {usageEntries.length > 0 ? (
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-[10px] uppercase tracking-wider text-on-surface-variant/70">
+                      <th className="text-left font-medium py-1 pr-4">Agent</th>
+                      <th className="text-left font-medium py-1 pr-4">Model</th>
+                      <th className="text-right font-medium py-1 pr-4">Input</th>
+                      <th className="text-right font-medium py-1 pr-4">Output</th>
+                      <th className="text-right font-medium py-1">Cost</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/5">
+                    {usageEntries.map(([agentType, entry]) => (
+                      <tr key={agentType}>
+                        <td className="py-1.5 pr-4 text-on-surface">
+                          {AGENT_LABEL[agentType] ?? agentType}
+                        </td>
+                        <td className="py-1.5 pr-4 font-mono text-[11px] text-on-surface-variant">
+                          {MODEL_LABEL[entry.model] ?? entry.model}
+                        </td>
+                        <td className="py-1.5 pr-4 text-right tabular-nums text-on-surface-variant">
+                          {formatTokens(entry.input_tokens)}
+                        </td>
+                        <td className="py-1.5 pr-4 text-right tabular-nums text-on-surface-variant">
+                          {formatTokens(entry.output_tokens)}
+                        </td>
+                        <td className="py-1.5 text-right tabular-nums text-on-surface font-bold">
+                          {formatCost(entry.cost_usd)}
+                        </td>
+                      </tr>
+                    ))}
+                    <tr className="border-t-2 border-white/10">
+                      <td className="pt-2 pr-4 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+                        Σ Total
+                      </td>
+                      <td />
+                      <td className="pt-2 pr-4 text-right tabular-nums text-on-surface font-bold">
+                        {formatTokens(run.input_tokens ?? 0)}
+                      </td>
+                      <td className="pt-2 pr-4 text-right tabular-nums text-on-surface font-bold">
+                        {formatTokens(run.output_tokens ?? 0)}
+                      </td>
+                      <td className="pt-2 text-right tabular-nums text-primary font-extrabold">
+                        {formatCost(run.cost_usd)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              ) : (
+                <div className="text-xs text-on-surface-variant space-y-1">
+                  <p>Kein Model-Breakdown verfügbar (älterer Run).</p>
+                  <p className="font-mono">
+                    Total: {formatTokens(run.input_tokens ?? 0)} in / {formatTokens(run.output_tokens ?? 0)} out · {formatCost(run.cost_usd)}
+                  </p>
+                </div>
+              )}
+            </div>
+          </td>
+        </tr>
+      )}
+    </>
   );
 }

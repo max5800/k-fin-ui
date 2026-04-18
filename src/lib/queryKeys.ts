@@ -41,4 +41,10 @@ export const qk = {
     monthly: (y: number, m: number) => ['aggregates', 'monthly', y, m] as const,
     cashflow: (months: number) => ['aggregates', 'cashflow', months] as const,
   },
+  settings: {
+    all: ['settings'] as const,
+  },
+  categorization: {
+    pending: ['categorization', 'pending'] as const,
+  },
 } as const;
