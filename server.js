@@ -24,6 +24,15 @@ app.get('*', (_req, res) => {
   res.sendFile(path.join(distDir, 'index.html'));
 });
 
-app.listen(port, () => {
+const server = app.listen(port, () => {
   console.log(`k-fin-ui serving on :${port}, /api -> ${apiTarget}`);
 });
+
+// Graceful shutdown so K8s rolling updates drain in-flight requests
+// instead of waiting out the termination grace period.
+for (const signal of ['SIGTERM', 'SIGINT']) {
+  process.on(signal, () => {
+    console.log(`${signal} received, closing server`);
+    server.close(() => process.exit(0));
+  });
+}
