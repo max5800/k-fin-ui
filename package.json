@@ -12,7 +12,7 @@
     "release": "semantic-release",
     "release:dry": "semantic-release --dry-run",
     "lint:commits": "commitlint --from=HEAD~1",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "dependencies": {
     "@google/genai": "^1.29.0",
