@@ -1,3 +1,10 @@
+## [1.0.2](https://github.com/max5800/k-fin-ui/compare/v1.0.1...v1.0.2) (2026-04-23)
+
+
+### Bug Fixes
+
+* **build:** tolerate missing husky in prepare script ([27a6392](https://github.com/max5800/k-fin-ui/commit/27a63921ed3974a9bd9e5ddcbd9f4fe994dce2ef))
+
 ## [1.0.1](https://github.com/max5800/k-fin-ui/compare/v1.0.0...v1.0.1) (2026-04-23)
 
 
