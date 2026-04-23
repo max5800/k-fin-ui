@@ -1,3 +1,10 @@
+## [1.0.1](https://github.com/max5800/k-fin-ui/compare/v1.0.0...v1.0.1) (2026-04-23)
+
+
+### Bug Fixes
+
+* **server:** handle SIGTERM/SIGINT for graceful shutdown ([5e0d8cb](https://github.com/max5800/k-fin-ui/commit/5e0d8cb7fe88489100ba14aec19f5ded9aae4c8c))
+
 # 1.0.0 (2026-04-18)
 
 
