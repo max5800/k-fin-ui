@@ -1,7 +1,7 @@
 import { ArrowRight, Loader2, Lock, Mail, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -10,13 +10,15 @@ import { useLogin } from '../api/auth';
 
 const loginSchema = z.object({
   email: z.string().email('Gültige E-Mail erforderlich'),
-  password: z.string().min(6, 'Mindestens 6 Zeichen'),
+  password: z.string().min(12, 'Mindestens 12 Zeichen'),
 });
 
 type LoginFormData = z.infer<typeof loginSchema>;
 
 export default function Login() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const sessionExpired = searchParams.get('expired') === '1';
   const login = useLogin();
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -33,6 +35,7 @@ export default function Login() {
     try {
       const res = await login.mutateAsync(data);
       localStorage.setItem('kfin_token', res.access_token);
+      localStorage.setItem('kfin_display_name', res.user.display_name);
       navigate('/');
     } catch (err) {
       if (isAxiosError(err) && err.response?.status === 401) {
@@ -61,6 +64,12 @@ export default function Login() {
           <h1 className="text-3xl font-extrabold text-primary uppercase tracking-tighter">k-fin</h1>
           <p className="text-on-surface-variant text-sm mt-2">Deine Finanzen. Klar.</p>
         </div>
+
+        {sessionExpired && (
+          <div className="mb-5 px-4 py-3 rounded-xl bg-error/10 border border-error/20 text-error text-xs font-bold text-center" role="alert">
+            Sitzung abgelaufen — bitte erneut anmelden
+          </div>
+        )}
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
           <div className="space-y-2">
@@ -100,9 +109,6 @@ export default function Login() {
           </div>
 
           <div className="flex items-center justify-end text-xs">
-            <button type="button" className="text-primary hover:text-primary/80 transition-colors font-bold">
-              Passwort vergessen?
-            </button>
           </div>
 
           {authError && (

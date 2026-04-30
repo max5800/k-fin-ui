@@ -1,4 +1,4 @@
-import { Cloud, Layers, LogOut, RefreshCw, Sliders, Smartphone, User, X } from 'lucide-react';
+import { Cloud, KeyRound, Layers, LogOut, RefreshCw, Sliders, Smartphone, User, X } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -6,6 +6,7 @@ import { isAxiosError } from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStartSync, useNormalizeSync, useConfirmSync } from '../api/sync';
 import { useSettings, useUpdateSettings } from '../api/settings';
+import { useChangePassword } from '../api/auth';
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -15,7 +16,14 @@ export default function Settings() {
   const normalize = useNormalizeSync();
   const settingsQuery = useSettings();
   const updateSettings = useUpdateSettings();
+  const changePassword = useChangePassword();
   const [thresholdDraft, setThresholdDraft] = useState<number>(0.6);
+
+  // Change-password form state
+  const [currentPw, setCurrentPw] = useState('');
+  const [newPw, setNewPw] = useState('');
+  const [pwError, setPwError] = useState<string | null>(null);
+  const [pwSuccess, setPwSuccess] = useState(false);
 
   useEffect(() => {
     if (settingsQuery.data) {
@@ -62,8 +70,27 @@ export default function Settings() {
 
   const handleLogout = () => {
     localStorage.removeItem('kfin_token');
+    localStorage.removeItem('kfin_display_name');
     queryClient.clear();
     navigate('/login');
+  };
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPwError(null);
+    setPwSuccess(false);
+    if (newPw.length < 12) {
+      setPwError('Neues Passwort muss mindestens 12 Zeichen haben');
+      return;
+    }
+    try {
+      await changePassword.mutateAsync({ current_password: currentPw, new_password: newPw });
+      setPwSuccess(true);
+      setCurrentPw('');
+      setNewPw('');
+    } catch (err) {
+      setPwError(extractError(err, 'Passwort konnte nicht geändert werden'));
+    }
   };
 
   const isSyncing = startSync.isPending;
@@ -230,6 +257,66 @@ export default function Settings() {
           </div>
         </section>
       </div>
+
+      {/* Account section */}
+      <section className="bg-surface-container-low rounded-2xl border border-white/5 p-6 mt-8 max-w-3xl">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+            <KeyRound className="w-5 h-5" />
+          </div>
+          <div>
+            <h3 className="font-headline font-bold text-on-surface">Konto</h3>
+            <p className="text-xs text-on-surface-variant">Passwort ändern</p>
+          </div>
+        </div>
+
+        <div className="mb-4 text-sm text-on-surface-variant">
+          Angemeldet als <span className="text-on-surface font-bold">{localStorage.getItem('kfin_display_name') ?? '—'}</span>
+        </div>
+
+        <form onSubmit={handleChangePassword} className="space-y-4">
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+              Aktuelles Passwort
+            </label>
+            <input
+              type="password"
+              value={currentPw}
+              onChange={(e) => setCurrentPw(e.target.value)}
+              autoComplete="current-password"
+              required
+              className="w-full bg-surface-container-lowest px-4 py-3 rounded-xl text-sm text-on-surface outline-none border border-transparent focus:border-primary/50 transition-all"
+            />
+          </div>
+          <div className="space-y-1">
+            <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+              Neues Passwort <span className="normal-case font-normal">(min. 12 Zeichen)</span>
+            </label>
+            <input
+              type="password"
+              value={newPw}
+              onChange={(e) => setNewPw(e.target.value)}
+              autoComplete="new-password"
+              required
+              minLength={12}
+              className="w-full bg-surface-container-lowest px-4 py-3 rounded-xl text-sm text-on-surface outline-none border border-transparent focus:border-primary/50 transition-all"
+            />
+          </div>
+          {pwError && (
+            <p className="text-xs text-error font-bold" role="alert">{pwError}</p>
+          )}
+          {pwSuccess && (
+            <p className="text-xs text-primary font-bold" role="status">Passwort erfolgreich geändert</p>
+          )}
+          <button
+            type="submit"
+            disabled={changePassword.isPending}
+            className="bg-primary text-on-primary px-6 py-2.5 rounded-xl text-sm font-bold hover:brightness-110 transition-all disabled:opacity-50"
+          >
+            {changePassword.isPending ? 'Speichere…' : 'Passwort ändern'}
+          </button>
+        </form>
+      </section>
 
       <AnimatePresence>
         {pendingSessionId && (

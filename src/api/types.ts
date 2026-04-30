@@ -1,3 +1,11 @@
+export interface UserPublic {
+  id: string;
+  email: string;
+  display_name: string;
+  role: string;
+  last_login_at: string | null;
+}
+
 export type Category = {
   id: string;
   name: string;
