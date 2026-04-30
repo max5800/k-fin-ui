@@ -1,3 +1,10 @@
+# [1.1.0](https://github.com/max5800/k-fin-ui/compare/v1.0.2...v1.1.0) (2026-04-30)
+
+
+### Features
+
+* **auth:** wire JWT login, /me, and change-password (M10a) ([c8f4571](https://github.com/max5800/k-fin-ui/commit/c8f4571f34ee07571afd8a6d2c051cc2fb0374cf))
+
 ## [1.0.2](https://github.com/max5800/k-fin-ui/compare/v1.0.1...v1.0.2) (2026-04-23)
 
 
