@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from './client';
 
 export interface SyncStartResponse {
@@ -39,6 +39,87 @@ export function useConfirmSync() {
         { params: { session_id } },
       );
       return data;
+    },
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Historical backfill — same TAN-in-the-loop pattern, but the worker drives
+// the actual fetch as a long-running background task and the UI polls the
+// run status for progress.
+// ---------------------------------------------------------------------------
+
+export interface BackfillStartResponse {
+  status: string;
+  session_id: string;
+}
+
+export interface BackfillConfirmResponse {
+  status: string;
+  run_id: string;
+  target_start_date: string;
+}
+
+export type BackfillRunStatus =
+  | 'running'
+  | 'succeeded'
+  | 'failed'
+  | 'cancelled';
+
+export interface BackfillRunResponse {
+  run_id: string;
+  status: BackfillRunStatus;
+  target_start_date: string;
+  current_window_start: string | null;
+  windows_total: number;
+  windows_done: number;
+  rows_inserted: number;
+  progress_message: string | null;
+  error: string | null;
+  started_at: string;
+  finished_at: string | null;
+}
+
+export function useStartBackfill() {
+  return useMutation({
+    mutationFn: async (months: number) => {
+      const { data } = await apiClient.post<BackfillStartResponse>(
+        '/sync/backfill/start',
+        { months },
+      );
+      return data;
+    },
+  });
+}
+
+export function useConfirmBackfill() {
+  return useMutation({
+    mutationFn: async (session_id: string) => {
+      const { data } = await apiClient.post<BackfillConfirmResponse>(
+        '/sync/backfill/confirm',
+        null,
+        { params: { session_id } },
+      );
+      return data;
+    },
+  });
+}
+
+export function useBackfillRun(run_id: string | null) {
+  return useQuery({
+    queryKey: ['backfill-run', run_id],
+    queryFn: async (): Promise<BackfillRunResponse> => {
+      const { data } = await apiClient.get<BackfillRunResponse>(
+        `/sync/backfill/runs/${run_id}`,
+      );
+      return data;
+    },
+    enabled: !!run_id,
+    // Poll while the modal is open. We stop polling once the run is terminal.
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      if (!data) return 2000;
+      return data.status === 'running' ? 2000 : false;
     },
   });
 }
