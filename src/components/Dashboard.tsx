@@ -1,7 +1,15 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { motion } from 'motion/react';
-import { ArrowDownRight, ArrowUpRight, Sparkles, TrendingUp, Wallet } from 'lucide-react';
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  ChevronLeft,
+  ChevronRight,
+  Sparkles,
+  TrendingUp,
+  Wallet,
+} from 'lucide-react';
 import { useMonthlySummary, useCashflow } from '../api/aggregates';
 import { useTransactions } from '../api/transactions';
 import { useReports } from '../api/reports';
@@ -11,6 +19,15 @@ import type { CashflowPoint } from '../api/types';
 type Range = 3 | 6 | 12;
 
 const MONTH_SHORT_DE = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+const MONTH_LONG_DE = [
+  'Januar', 'Februar', 'März', 'April', 'Mai', 'Juni',
+  'Juli', 'August', 'September', 'Oktober', 'November', 'Dezember',
+];
+
+function shiftMonth(year: number, month: number, delta: number): { year: number; month: number } {
+  const d = new Date(year, month - 1 + delta, 1);
+  return { year: d.getFullYear(), month: d.getMonth() + 1 };
+}
 
 function buildChartPaths(series: CashflowPoint[], width = 800, height = 200) {
   if (series.length < 2) return null;
@@ -32,14 +49,39 @@ function buildChartPaths(series: CashflowPoint[], width = 800, height = 200) {
 
 export default function Dashboard() {
   const [range, setRange] = useState<Range>(6);
-  const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth() + 1;
 
-  const { data: summary, isPending: isSummaryPending } = useMonthlySummary(year, month);
+  // Selected month for the KPI cards. Defaults to the current month, but
+  // the effect below jumps back to the last month with > 5 transactions
+  // on initial load so a fresh-of-the-month dashboard isn't empty.
+  const now = new Date();
+  const [selected, setSelected] = useState(() => ({
+    year: now.getFullYear(),
+    month: now.getMonth() + 1,
+  }));
+  const [autoAdjusted, setAutoAdjusted] = useState(false);
+
+  const { data: summary, isPending: isSummaryPending } = useMonthlySummary(
+    selected.year,
+    selected.month,
+  );
   const { data: cashflow } = useCashflow(range);
   const { data: txs, isPending: isTxsPending } = useTransactions({ limit: 5 });
   const { data: reports } = useReports({ limit: 1 });
+
+  // First-load fallback: if the current month is essentially empty,
+  // hop back one month so the user sees real numbers instead of zeros.
+  useEffect(() => {
+    if (autoAdjusted || !summary) return;
+    if (summary.transaction_count <= 5) {
+      const prev = shiftMonth(selected.year, selected.month, -1);
+      setSelected(prev);
+    }
+    setAutoAdjusted(true);
+  }, [summary, autoAdjusted, selected.year, selected.month]);
+
+  const monthLabel = `${MONTH_LONG_DE[selected.month - 1]} ${selected.year}`;
+  const isCurrentMonth =
+    selected.year === now.getFullYear() && selected.month === now.getMonth() + 1;
 
   const latestReport = reports?.items?.[0];
   const saldoPositive = (summary?.net ?? 0) >= 0;
@@ -72,6 +114,47 @@ export default function Dashboard() {
 
   return (
     <div className="pt-28 px-8 pb-12 overflow-y-auto h-full space-y-8">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-headline font-extrabold text-on-surface">
+            {monthLabel}
+          </h1>
+          <p className="text-xs text-on-surface-variant mt-1">
+            {summary
+              ? `${summary.transaction_count} Transaktionen`
+              : isSummaryPending
+              ? 'Lade Daten…'
+              : 'Keine Transaktionen in diesem Monat'}
+          </p>
+        </div>
+        <div className="flex items-center gap-1 bg-surface-container-high rounded-lg p-1">
+          <button
+            onClick={() => setSelected((s) => shiftMonth(s.year, s.month, -1))}
+            className="px-2 py-1 text-on-surface-variant hover:text-on-surface rounded-md transition-colors"
+            aria-label="Vorheriger Monat"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          <button
+            onClick={() =>
+              setSelected({ year: now.getFullYear(), month: now.getMonth() + 1 })
+            }
+            disabled={isCurrentMonth}
+            className="px-3 py-1 text-xs font-bold rounded-md transition-colors text-on-surface-variant hover:text-on-surface disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            Heute
+          </button>
+          <button
+            onClick={() => setSelected((s) => shiftMonth(s.year, s.month, 1))}
+            disabled={isCurrentMonth}
+            className="px-2 py-1 text-on-surface-variant hover:text-on-surface rounded-md transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            aria-label="Nächster Monat"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         {kpis.map((kpi, i) => {
           const Icon = kpi.icon;
