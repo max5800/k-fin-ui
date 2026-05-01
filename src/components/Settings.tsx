@@ -1,5 +1,5 @@
 import { Cloud, KeyRound, Layers, LogOut, RefreshCw, Sliders, Smartphone, User, X } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
@@ -75,7 +75,7 @@ export default function Settings() {
     navigate('/login');
   };
 
-  const handleChangePassword = async (e: React.FormEvent) => {
+  const handleChangePassword = async (e: FormEvent) => {
     e.preventDefault();
     setPwError(null);
     setPwSuccess(false);
