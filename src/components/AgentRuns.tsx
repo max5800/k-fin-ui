@@ -51,28 +51,28 @@ const AGENTS: AgentMeta[] = [
     name: 'Wochenanalyse',
     desc: 'Wöchentliche Auswertung & Trends',
     icon: CalendarRange,
-    model: 'Sonnet 4',
+    model: 'Sonnet 4.6',
   },
   {
     id: 'monthly_analysis',
     name: 'Monatsanalyse',
     desc: 'Monatsbericht & Kategorien-Breakdown',
     icon: Calendar,
-    model: 'Sonnet 4',
+    model: 'Sonnet 4.6',
   },
   {
     id: 'anomaly',
     name: 'Anomalie-Erkennung',
     desc: 'Findet ungewöhnliche Ausgaben & Muster',
     icon: AlertTriangle,
-    model: 'Sonnet 4',
+    model: 'Sonnet 4.6',
   },
   {
     id: 'synthesis',
     name: 'Synthese',
     desc: 'Aggregiert Ergebnisse zu einer Gesamtschau',
     icon: Sparkles,
-    model: 'Sonnet 4',
+    model: 'Sonnet 4.6',
   },
 ];
 
