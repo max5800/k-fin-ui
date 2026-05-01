@@ -1,3 +1,10 @@
+## [1.3.1](https://github.com/max5800/k-fin-ui/compare/v1.3.0...v1.3.1) (2026-05-01)
+
+
+### Bug Fixes
+
+* **settings:** import FormEvent type instead of React namespace ([52c0008](https://github.com/max5800/k-fin-ui/commit/52c00083c797e65b5d76bdda946a91e50ad04296))
+
 # [1.3.0](https://github.com/max5800/k-fin-ui/compare/v1.2.0...v1.3.0) (2026-05-01)
 
 
