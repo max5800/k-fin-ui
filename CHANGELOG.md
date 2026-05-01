@@ -1,3 +1,10 @@
+# [1.4.0](https://github.com/max5800/k-fin-ui/compare/v1.3.2...v1.4.0) (2026-05-01)
+
+
+### Features
+
+* **reports-ui:** render agent report content + show synthesis on dashboard ([4bcf7f4](https://github.com/max5800/k-fin-ui/commit/4bcf7f4cb3a8cf15444766b47b1a3a089044e90b))
+
 ## [1.3.2](https://github.com/max5800/k-fin-ui/compare/v1.3.1...v1.3.2) (2026-05-01)
 
 
