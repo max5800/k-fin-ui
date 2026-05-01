@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  Ban,
   Calendar,
   CalendarRange,
   CheckCircle2,
@@ -17,6 +18,7 @@ import { AnimatePresence, motion } from 'motion/react';
 import { useEffect, useState, type ComponentType } from 'react';
 import { createPortal } from 'react-dom';
 import {
+  useCancelRun,
   useRuns,
   useTriggerFullPipeline,
   useTriggerRun,
@@ -79,6 +81,7 @@ const STATUS_STYLES: Record<RunStatus, string> = {
   running: 'bg-primary/10 text-primary border-primary/30',
   pending: 'bg-surface-container-high text-on-surface-variant border-white/10',
   failed: 'bg-error/10 text-error border-error/30',
+  cancelled: 'bg-white/5 text-on-surface-variant border-white/15',
 };
 
 const STATUS_LABEL: Record<RunStatus, string> = {
@@ -86,9 +89,13 @@ const STATUS_LABEL: Record<RunStatus, string> = {
   running: 'Läuft',
   pending: 'Wartet',
   failed: 'Fehlgeschlagen',
+  cancelled: 'Abgebrochen',
 };
 
 const FALLBACK_STYLE = 'bg-surface-container-high text-on-surface-variant border-white/10';
+
+// Heartbeat older than this (ms) on a running run hints "stuck?".
+const STALE_HEARTBEAT_MS = 3 * 60 * 1000;
 
 function formatDuration(seconds: number): string {
   if (seconds < 0) return '0:00';
@@ -127,8 +134,14 @@ export default function AgentRuns() {
   const { mutate: triggerRun, isPending: isTriggering, variables: triggeringAgent } =
     useTriggerRun();
   const { mutate: triggerFull, isPending: isTriggeringFull } = useTriggerFullPipeline();
+  const {
+    mutate: cancelRun,
+    isPending: isCancelling,
+    variables: cancellingId,
+  } = useCancelRun();
 
   const [pending, setPending] = useState<PendingTrigger | null>(null);
+  const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
   const toggleExpand = (id: string) => {
     setExpandedRuns((prev) => {
@@ -161,6 +174,15 @@ export default function AgentRuns() {
     }
   };
 
+  const cancelTargetRun = cancelTargetId
+    ? runsData?.items.find((r) => r.id === cancelTargetId) ?? null
+    : null;
+
+  const confirmCancel = () => {
+    if (!cancelTargetId) return;
+    cancelRun(cancelTargetId, { onSettled: () => setCancelTargetId(null) });
+  };
+
   return (
     <div className="pt-24 px-8 pb-12 overflow-y-auto h-screen">
       <div className="flex justify-between items-end mb-8">
@@ -171,24 +193,40 @@ export default function AgentRuns() {
           <h1 className="font-headline text-3xl font-extrabold tracking-tight">Agents</h1>
         </div>
         {hasActiveRun && activeRun && (
-          <div className="flex items-center gap-3 bg-surface-container-low px-4 py-2 rounded-full border border-primary/20">
-            <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-xs font-bold text-on-surface tabular-nums">
-              {formatDuration(activeElapsed)}
-              {activeEstimate !== null && (
-                <span className="text-on-surface-variant font-normal">
-                  {' '}/ ≈ {formatDuration(activeEstimate)}
-                  {activeRemaining !== null && activeRemaining > 0 && (
-                    <span> · noch {formatDuration(activeRemaining)}</span>
-                  )}
-                </span>
-              )}
-            </span>
-            {activeRun.progress_total ? (
-              <span className="text-xs font-medium text-on-surface-variant tabular-nums">
-                · {activeRun.progress_current ?? 0}/{activeRun.progress_total}
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 bg-surface-container-low px-4 py-2 rounded-full border border-primary/20">
+              <div className="w-2 h-2 rounded-full bg-primary animate-pulse" />
+              <span className="text-xs font-bold text-on-surface tabular-nums">
+                {formatDuration(activeElapsed)}
+                {activeEstimate !== null && (
+                  <span className="text-on-surface-variant font-normal">
+                    {' '}/ ≈ {formatDuration(activeEstimate)}
+                    {activeRemaining !== null && activeRemaining > 0 && (
+                      <span> · noch {formatDuration(activeRemaining)}</span>
+                    )}
+                  </span>
+                )}
               </span>
-            ) : null}
+              {activeRun.progress_total ? (
+                <span className="text-xs font-medium text-on-surface-variant tabular-nums">
+                  · {activeRun.progress_current ?? 0}/{activeRun.progress_total}
+                </span>
+              ) : null}
+            </div>
+            {activeRun.status === 'running' && (
+              <button
+                onClick={() => setCancelTargetId(activeRun.id)}
+                disabled={isCancelling && cancellingId === activeRun.id}
+                className="inline-flex items-center gap-1.5 text-xs font-bold px-3 py-2 rounded-full border border-white/10 bg-surface-container-low text-on-surface-variant hover:text-on-surface hover:border-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCancelling && cancellingId === activeRun.id ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Ban className="w-3.5 h-3.5" />
+                )}
+                Abbrechen
+              </button>
+            )}
           </div>
         )}
       </div>
@@ -306,6 +344,8 @@ export default function AgentRuns() {
                     estimate={estimatedSeconds(runsData?.items, run.agent_name)}
                     expanded={expandedRuns.has(run.id)}
                     onToggleExpand={() => toggleExpand(run.id)}
+                    onCancel={() => setCancelTargetId(run.id)}
+                    isCancelling={isCancelling && cancellingId === run.id}
                   />
                 ))
               )}
@@ -316,6 +356,75 @@ export default function AgentRuns() {
 
       {createPortal(
         <AnimatePresence>
+        {cancelTargetRun && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+            onClick={isCancelling ? undefined : () => setCancelTargetId(null)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md bg-surface-container-low border border-white/5 rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-white/5 flex items-center justify-center text-on-surface-variant">
+                    <Ban className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-headline font-bold text-on-surface">
+                      Run wirklich abbrechen?
+                    </h3>
+                    <p className="text-xs text-on-surface-variant">
+                      {AGENT_LABEL[cancelTargetRun.agent_name] ?? cancelTargetRun.agent_name}
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setCancelTargetId(null)}
+                  disabled={isCancelling}
+                  className="text-on-surface-variant hover:text-on-surface disabled:opacity-30"
+                  aria-label="Schließen"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
+                Bereits verarbeitete Batches bleiben erhalten, aber der Rest des Runs wird gestoppt.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setCancelTargetId(null)}
+                  disabled={isCancelling}
+                  className="flex-1 bg-surface-container-high hover:bg-surface-container-highest py-3 rounded-xl text-sm font-bold text-on-surface transition-all disabled:opacity-50"
+                >
+                  Weiterlaufen lassen
+                </button>
+                <button
+                  onClick={confirmCancel}
+                  disabled={isCancelling}
+                  className="flex-1 bg-error/90 text-white py-3 rounded-xl text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-all disabled:opacity-50"
+                >
+                  {isCancelling ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                      Breche ab…
+                    </>
+                  ) : (
+                    'Ja, abbrechen'
+                  )}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
         {pending && (
           <motion.div
             initial={{ opacity: 0 }}
@@ -440,19 +549,39 @@ function RunRow({
   estimate,
   expanded,
   onToggleExpand,
+  onCancel,
+  isCancelling,
 }: {
   run: Run;
   estimate: number | null;
   expanded: boolean;
   onToggleExpand: () => void;
+  onCancel: () => void;
+  isCancelling: boolean;
   key?: string;
 }) {
-  const status = run.status as RunStatus;
+  const status: RunStatus = run.status;
   const isActive = status === 'running' || status === 'pending';
   const styleClass = STATUS_STYLES[status] ?? FALLBACK_STYLE;
   const label = STATUS_LABEL[status] ?? status;
 
   const elapsed = useElapsed(run.started_at, isActive);
+
+  // Tick once a minute so the "stale heartbeat" hint flips on without
+  // waiting for the next list refetch.
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    if (status !== 'running') return;
+    const id = setInterval(() => setNow(Date.now()), 30_000);
+    return () => clearInterval(id);
+  }, [status]);
+
+  const heartbeatAgeMs =
+    status === 'running' && run.heartbeat_at
+      ? now - Date.parse(run.heartbeat_at)
+      : null;
+  const isStale =
+    heartbeatAgeMs !== null && heartbeatAgeMs > STALE_HEARTBEAT_MS;
 
   const finalDuration =
     run.finished_at && run.started_at
@@ -511,17 +640,38 @@ function RunRow({
           {durationText}
         </td>
         <td className="px-6 py-4 text-right">
-          <span
-            className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase border ${styleClass}`}
-            title={run.error ?? undefined}
-          >
+          <div className="inline-flex items-center gap-2 justify-end">
             {status === 'running' && (
-              <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onCancel();
+                }}
+                disabled={isCancelling}
+                className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Run abbrechen"
+              >
+                {isCancelling ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <Ban className="w-3 h-3" />
+                )}
+                Abbrechen
+              </button>
             )}
-            {status === 'succeeded' && <CheckCircle2 className="w-3 h-3" />}
-            {status === 'failed' && <XCircle className="w-3 h-3" />}
-            {label}
-          </span>
+            <span
+              className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase border ${styleClass}`}
+              title={run.error ?? undefined}
+            >
+              {status === 'running' && (
+                <span className="w-1.5 h-1.5 rounded-full bg-primary animate-pulse" />
+              )}
+              {status === 'succeeded' && <CheckCircle2 className="w-3 h-3" />}
+              {status === 'failed' && <XCircle className="w-3 h-3" />}
+              {status === 'cancelled' && <Ban className="w-3 h-3" />}
+              {label}
+            </span>
+          </div>
         </td>
       </tr>
       {status === 'failed' && run.error && (
@@ -540,11 +690,11 @@ function RunRow({
           </td>
         </tr>
       )}
-      {isActive && (run.progress_message || progress) && (
+      {isActive && (run.progress_message || progress || (status === 'running' && run.last_error) || isStale) && (
         <tr className="bg-surface-container/10">
-          <td colSpan={6} className="px-6 pb-4 pt-0">
+          <td colSpan={6} className="px-6 pb-4 pt-0 space-y-2">
             {progress && (
-              <div className="mb-2 h-1.5 w-full bg-primary/10 rounded-full overflow-hidden">
+              <div className="h-1.5 w-full bg-primary/10 rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary transition-all duration-500"
                   style={{ width: `${progress.pct}%` }}
@@ -552,13 +702,31 @@ function RunRow({
               </div>
             )}
             <div className="flex items-center justify-between text-[11px] text-on-surface-variant">
-              <span>{run.progress_message ?? 'läuft…'}</span>
+              <span className="flex items-center gap-2">
+                {run.progress_message ?? 'läuft…'}
+                {isStale && heartbeatAgeMs !== null && (
+                  <span
+                    className="inline-flex items-center gap-1 text-on-surface-variant/70 italic"
+                    title={`Letztes Lebenszeichen vor ${Math.floor(heartbeatAgeMs / 60_000)} Min.`}
+                  >
+                    · stale? ({Math.floor(heartbeatAgeMs / 60_000)}m)
+                  </span>
+                )}
+              </span>
               {progress && (
                 <span className="tabular-nums font-bold text-on-surface">
                   {progress.current}/{progress.total} ({progress.pct}%)
                 </span>
               )}
             </div>
+            {status === 'running' && run.last_error && (
+              <div className="flex items-start gap-2 text-[11px] rounded-md border border-amber-400/30 bg-amber-400/10 text-amber-200 px-3 py-2">
+                <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+                <p className="leading-relaxed">
+                  Letzter Fehler: {run.last_error} — Versuche werden wiederholt
+                </p>
+              </div>
+            )}
           </td>
         </tr>
       )}

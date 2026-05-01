@@ -50,7 +50,7 @@ export type AgentName =
   | 'anomaly'
   | 'synthesis';
 
-export type RunStatus = 'pending' | 'running' | 'succeeded' | 'failed';
+export type RunStatus = 'pending' | 'running' | 'succeeded' | 'failed' | 'cancelled';
 
 export type UsageBreakdownEntry = {
   model: string;
@@ -66,6 +66,8 @@ export type Run = {
   trigger: string;
   result: Record<string, unknown> | null;
   error: string | null;
+  last_error: string | null;
+  heartbeat_at: string | null;
   started_at: string;
   finished_at: string | null;
   progress_current: number | null;

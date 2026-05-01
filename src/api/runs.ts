@@ -63,3 +63,16 @@ export function useTriggerFullPipeline() {
     },
   });
 }
+
+export function useCancelRun() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (run_id: string) => {
+      await apiClient.delete(`/runs/${run_id}`);
+      return run_id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.runs.all });
+    },
+  });
+}
