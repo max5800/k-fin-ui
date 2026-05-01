@@ -1,3 +1,10 @@
+# [1.3.0](https://github.com/max5800/k-fin-ui/compare/v1.2.0...v1.3.0) (2026-05-01)
+
+
+### Features
+
+* **dashboard:** month picker + auto-fallback to last month with data ([7c8cc2c](https://github.com/max5800/k-fin-ui/commit/7c8cc2c2b882200ed3d84be6b0ef64ea9b016650))
+
 # [1.2.0](https://github.com/max5800/k-fin-ui/compare/v1.1.0...v1.2.0) (2026-05-01)
 
 
