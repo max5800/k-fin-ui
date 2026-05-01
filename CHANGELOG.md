@@ -1,3 +1,10 @@
+## [1.3.2](https://github.com/max5800/k-fin-ui/compare/v1.3.1...v1.3.2) (2026-05-01)
+
+
+### Bug Fixes
+
+* **agents-ui:** label all analysis agents as Sonnet 4.6 ([6dfeae7](https://github.com/max5800/k-fin-ui/commit/6dfeae7bf33ff184027cbe5ae50513acd2854412))
+
 ## [1.3.1](https://github.com/max5800/k-fin-ui/compare/v1.3.0...v1.3.1) (2026-05-01)
 
 
