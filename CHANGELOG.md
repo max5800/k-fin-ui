@@ -1,3 +1,10 @@
+# [1.5.0](https://github.com/max5800/k-fin-ui/compare/v1.4.0...v1.5.0) (2026-05-01)
+
+
+### Features
+
+* **backfill-ui:** historical transaction backfill section in Settings ([f37d73d](https://github.com/max5800/k-fin-ui/commit/f37d73d862ecc384f2c3b5334ebbdac73c86d409))
+
 # [1.4.0](https://github.com/max5800/k-fin-ui/compare/v1.3.2...v1.4.0) (2026-05-01)
 
 
