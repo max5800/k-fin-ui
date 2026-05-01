@@ -1,3 +1,10 @@
+# [1.2.0](https://github.com/max5800/k-fin-ui/compare/v1.1.0...v1.2.0) (2026-05-01)
+
+
+### Features
+
+* **runs:** support cancel, last_error warnings, and cancelled status ([8b37d76](https://github.com/max5800/k-fin-ui/commit/8b37d76233fb12a109d23d85b1f0197873fe5788))
+
 # [1.1.0](https://github.com/max5800/k-fin-ui/compare/v1.0.2...v1.1.0) (2026-04-30)
 
 
