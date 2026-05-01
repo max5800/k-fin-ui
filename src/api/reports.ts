@@ -1,11 +1,19 @@
 import { useQuery } from '@tanstack/react-query';
 import { apiClient } from './client';
 import { qk } from '../lib/queryKeys';
-import type { Report, PaginatedResponse } from './types';
+import type { Report, PaginatedResponse, ReportType } from './types';
 
-export function useReports(filters: { limit?: number; offset?: number } = {}) {
+type ReportFilters = {
+  limit?: number;
+  offset?: number;
+  report_type?: ReportType | string;
+};
+
+export function useReports(filters: ReportFilters = {}) {
   return useQuery({
-    queryKey: qk.reports.all,
+    // Filter participates in the cache key so changing report_type doesn't
+    // hand back a stale "all reports" list.
+    queryKey: [...qk.reports.all, filters] as const,
     queryFn: async () => {
       const { data } = await apiClient.get<PaginatedResponse<Report>>('/reports', {
         params: filters,
@@ -26,25 +34,48 @@ export function useReport(id: string) {
   });
 }
 
-export function downloadReport(id: string) {
+// Parse `attachment; filename="foo.json"` (and the RFC-5987 `filename*=`
+// variant) out of a Content-Disposition header. Returns null if absent.
+function filenameFromContentDisposition(value: string | null): string | null {
+  if (!value) return null;
+  const star = /filename\*=(?:UTF-8'')?([^;]+)/i.exec(value);
+  if (star) {
+    try {
+      return decodeURIComponent(star[1].replace(/^"|"$/g, ''));
+    } catch {
+      // fall through to plain `filename=`
+    }
+  }
+  const plain = /filename="?([^";]+)"?/i.exec(value);
+  return plain ? plain[1] : null;
+}
+
+export async function downloadReport(id: string): Promise<void> {
   const url = `${apiClient.defaults.baseURL}/reports/${id}/download`;
   const token = localStorage.getItem('kfin_token');
-  
-  // Custom download helper since it requires auth header
-  fetch(url, {
-    headers: {
-      'Authorization': `Bearer ${token}`
-    }
-  })
-  .then(response => response.blob())
-  .then(blob => {
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `report-${id}.pdf`; // or .md
-    document.body.appendChild(a);
-    a.click();
-    window.URL.revokeObjectURL(url);
-  })
-  .catch(console.error);
+
+  const response = await fetch(url, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (!response.ok) {
+    console.error('Report download failed:', response.status, await response.text());
+    return;
+  }
+
+  // Backend sets Content-Disposition with the canonical filename
+  // (`<report_type>-<period>.json` for JSON content, original file name
+  // for disk-backed PDFs/MDs). Trust it instead of guessing the suffix.
+  const filename =
+    filenameFromContentDisposition(response.headers.get('Content-Disposition')) ??
+    `report-${id}`;
+
+  const blob = await response.blob();
+  const blobUrl = window.URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = blobUrl;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  window.URL.revokeObjectURL(blobUrl);
 }

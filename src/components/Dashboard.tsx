@@ -14,7 +14,7 @@ import { useMonthlySummary, useCashflow } from '../api/aggregates';
 import { useTransactions } from '../api/transactions';
 import { useReports } from '../api/reports';
 import { formatCurrency, formatDate } from '../lib/format';
-import type { CashflowPoint } from '../api/types';
+import type { CashflowPoint, SynthesisContent } from '../api/types';
 
 type Range = 3 | 6 | 12;
 
@@ -66,7 +66,9 @@ export default function Dashboard() {
   );
   const { data: cashflow } = useCashflow(range);
   const { data: txs, isPending: isTxsPending } = useTransactions({ limit: 5 });
-  const { data: reports } = useReports({ limit: 1 });
+  // Dashboard tile only cares about the latest synthesis — that's the
+  // human-readable Executive Summary the user wants to see at a glance.
+  const { data: reports } = useReports({ limit: 1, report_type: 'synthesis' });
 
   // First-load fallback: if the current month is essentially empty,
   // hop back one month so the user sees real numbers instead of zeros.
@@ -84,6 +86,9 @@ export default function Dashboard() {
     selected.year === now.getFullYear() && selected.month === now.getMonth() + 1;
 
   const latestReport = reports?.items?.[0];
+  const latestSynthesis = (latestReport?.content ?? null) as
+    | SynthesisContent
+    | null;
   const saldoPositive = (summary?.net ?? 0) >= 0;
 
   const chart = cashflow?.series ? buildChartPaths(cashflow.series) : null;
@@ -283,16 +288,22 @@ export default function Dashboard() {
                 </div>
                 <div>
                   <h4 className="text-lg font-headline font-bold text-on-surface">
-                    Neuester AI-Report
+                    Wochen-Synthese
                   </h4>
                   <p className="text-xs text-primary font-bold uppercase tracking-widest">
                     {formatDate(latestReport.created_at, 'dd.MM.yyyy')}
                   </p>
                 </div>
               </div>
-              <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
-                {latestReport.title}
-              </p>
+              {latestSynthesis?.executive_summary ? (
+                <p className="text-sm text-on-surface leading-relaxed mb-6 line-clamp-4">
+                  {latestSynthesis.executive_summary}
+                </p>
+              ) : (
+                <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
+                  {latestReport.title}
+                </p>
+              )}
               <Link
                 to="/reports"
                 className="inline-block bg-primary text-on-primary text-xs font-bold py-2.5 px-6 rounded-lg hover:brightness-110 transition-all"

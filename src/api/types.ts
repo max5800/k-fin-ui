@@ -107,8 +107,66 @@ export type PendingResponse = {
   items: PendingSuggestion[];
 };
 
+export type ReportType =
+  | 'categorization'
+  | 'weekly_analysis'
+  | 'monthly_analysis'
+  | 'anomaly'
+  | 'synthesis';
+
+// Shape of a CategorizationResult.suggestions[] entry as persisted in
+// Report.content. Mirrors `src/agents/types.py::CategorySuggestion`.
+export type CategorySuggestionContent = {
+  transaction_id: string;
+  suggested_category_id: string;
+  confidence: number;
+  reasoning: string;
+};
+
+export type CategorizationContent = {
+  suggestions: CategorySuggestionContent[];
+  uncategorized_count: number;
+  high_confidence_count: number;
+};
+
+export type ObservationContent = {
+  category: string;
+  summary: string;
+  severity: string;
+  transaction_ids: string[];
+  metrics: Record<string, unknown>;
+};
+
+export type AnalysisContent = {
+  observations: ObservationContent[];
+  period: string;
+  summary_text: string;
+};
+
+export type AnomalyContent = {
+  anomalies: ObservationContent[];
+  period: string;
+  total_anomalies: number;
+  new_counterparties: string[];
+};
+
+export type SynthesisContent = {
+  executive_summary: string;
+  key_observations: ObservationContent[];
+  action_items: string[];
+  period: string;
+};
+
+export type ReportContent =
+  | CategorizationContent
+  | AnalysisContent
+  | AnomalyContent
+  | SynthesisContent
+  | Record<string, unknown>;
+
 export type Report = {
   id: string;
+  report_type: ReportType | string;
   title: string;
   period_start: string;
   period_end: string;
@@ -117,6 +175,7 @@ export type Report = {
   size_bytes: number | null;
   status: string;
   error: string | null;
+  content: ReportContent | null;
   created_at: string;
   updated_at: string;
 };
