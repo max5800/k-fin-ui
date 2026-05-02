@@ -266,8 +266,11 @@ export default function Dashboard() {
             </div>
 
             {cashflow?.series && cashflow.series.length > 0 && (
-              <div className="grid grid-cols-6 mt-6 text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
-                {cashflow.series.slice(-6).map((p) => (
+              <div
+                className="mt-6 grid text-[10px] text-on-surface-variant font-bold uppercase tracking-wider"
+                style={{ gridTemplateColumns: `repeat(${cashflow.series.length}, minmax(0, 1fr))` }}
+              >
+                {cashflow.series.map((p) => (
                   <span key={`${p.year}-${p.month}`} className="text-center">
                     {MONTH_SHORT_DE[p.month - 1]} {String(p.year).slice(-2)}
                   </span>
