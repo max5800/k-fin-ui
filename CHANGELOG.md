@@ -1,3 +1,16 @@
+# [1.6.0](https://github.com/max5800/k-fin-ui/compare/v1.5.0...v1.6.0) (2026-05-02)
+
+
+### Bug Fixes
+
+* **dashboard:** label every cashflow point on x-axis ([b99448c](https://github.com/max5800/k-fin-ui/commit/b99448c08293b7bc8e19b5147cba166e031163fe))
+
+
+### Features
+
+* **categories:** new categories page with budgets as a column ([102c077](https://github.com/max5800/k-fin-ui/commit/102c077e470dc97e43c2e33da9e4b94564d493ba))
+* **dashboard:** cashflow chart with diverging bars and tooltip ([25267fe](https://github.com/max5800/k-fin-ui/commit/25267fe4f7bdd01aaccc464f2f08e7d25d18b1b7))
+
 # [1.5.0](https://github.com/max5800/k-fin-ui/compare/v1.4.0...v1.5.0) (2026-05-01)
 
 
