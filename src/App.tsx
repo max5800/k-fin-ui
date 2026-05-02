@@ -6,7 +6,7 @@ import MainLayout from './components/MainLayout';
 import ProtectedRoute from './components/ProtectedRoute';
 
 import AgentRuns from './components/AgentRuns';
-import Budgets from './components/Budgets';
+import Categories from './components/Categories';
 import Dashboard from './components/Dashboard';
 import Login from './components/Login';
 import Onboarding from './components/Onboarding';
@@ -60,7 +60,8 @@ export default function App() {
                 <Route index element={<Dashboard />} />
                 <Route path="transactions" element={<Transactions />} />
                 <Route path="portfolio" element={<Portfolio />} />
-                <Route path="budgets" element={<Budgets />} />
+                <Route path="categories" element={<Categories />} />
+                <Route path="budgets" element={<Navigate to="/categories" replace />} />
                 <Route path="agents" element={<AgentRuns />} />
                 <Route path="review" element={<PendingReview />} />
                 <Route path="reports" element={<Reports />} />
