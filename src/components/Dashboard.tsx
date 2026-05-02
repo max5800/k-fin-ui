@@ -10,6 +10,16 @@ import {
   TrendingUp,
   Wallet,
 } from 'lucide-react';
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
 import { useMonthlySummary, useCashflow } from '../api/aggregates';
 import { useTransactions } from '../api/transactions';
 import { useReports } from '../api/reports';
@@ -29,22 +39,54 @@ function shiftMonth(year: number, month: number, delta: number): { year: number;
   return { year: d.getFullYear(), month: d.getMonth() + 1 };
 }
 
-function buildChartPaths(series: CashflowPoint[], width = 800, height = 200) {
-  if (series.length < 2) return null;
-  const values = series.map((s) => s.net);
-  const min = Math.min(...values, 0);
-  const max = Math.max(...values, 0);
-  const range = max - min || 1;
-  const stepX = width / (series.length - 1);
-  const points = series.map((s, i) => ({
-    x: i * stepX,
-    y: height - ((s.net - min) / range) * (height * 0.85) - height * 0.075,
+type ChartPoint = {
+  label: string;
+  income: number;
+  expenses: number;
+  net: number;
+  txCount: number;
+};
+
+function toChartData(series: CashflowPoint[]): ChartPoint[] {
+  return series.map((p) => ({
+    label: `${MONTH_SHORT_DE[p.month - 1]} ${String(p.year).slice(-2)}`,
+    income: p.income,
+    // Backend stores expenses as a negative number; the natural sign carries
+    // straight into a diverging bar chart (income above 0, expenses below).
+    expenses: p.expenses,
+    net: p.net,
+    txCount: p.transaction_count,
   }));
-  const line = points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x.toFixed(1)},${p.y.toFixed(1)}`)
-    .join(' ');
-  const area = `${line} L${width.toFixed(1)},${height.toFixed(1)} L0,${height.toFixed(1)} Z`;
-  return { line, area, points };
+}
+
+function CashflowTooltip({ active, payload }: { active?: boolean; payload?: { payload: ChartPoint }[] }) {
+  if (!active || !payload?.length) return null;
+  const p = payload[0].payload;
+  return (
+    <div className="bg-surface-container-highest border border-white/10 rounded-lg px-4 py-3 shadow-2xl text-xs">
+      <p className="font-bold text-on-surface mb-2 uppercase tracking-wider">{p.label}</p>
+      <div className="space-y-1 tabular-nums">
+        <div className="flex justify-between gap-6">
+          <span className="text-on-surface-variant">Einnahmen</span>
+          <span className="text-primary font-bold">+{formatCurrency(p.income)}</span>
+        </div>
+        <div className="flex justify-between gap-6">
+          <span className="text-on-surface-variant">Ausgaben</span>
+          <span className="text-error font-bold">{formatCurrency(p.expenses)}</span>
+        </div>
+        <div className="flex justify-between gap-6 border-t border-white/10 pt-1 mt-1">
+          <span className="text-on-surface-variant">Netto</span>
+          <span className={`font-bold ${p.net >= 0 ? 'text-secondary' : 'text-error'}`}>
+            {p.net >= 0 ? '+' : ''}{formatCurrency(p.net)}
+          </span>
+        </div>
+        <div className="flex justify-between gap-6 text-[10px] text-on-surface-variant pt-1">
+          <span>Transaktionen</span>
+          <span>{p.txCount}</span>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 export default function Dashboard() {
@@ -91,7 +133,7 @@ export default function Dashboard() {
     | null;
   const saldoPositive = (summary?.net ?? 0) >= 0;
 
-  const chart = cashflow?.series ? buildChartPaths(cashflow.series) : null;
+  const chartData = cashflow?.series ? toChartData(cashflow.series) : [];
 
   const kpis = [
     {
@@ -233,29 +275,51 @@ export default function Dashboard() {
               </div>
             </div>
 
-            <div className="relative h-64 w-full">
-              {chart ? (
-                <svg
-                  className="w-full h-full"
-                  viewBox="0 0 800 200"
-                  preserveAspectRatio="none"
-                >
-                  <defs>
-                    <linearGradient id="chartFill" x1="0" x2="0" y1="0" y2="1">
-                      <stop offset="0%" stopColor="#44d8f1" stopOpacity="0.25" />
-                      <stop offset="100%" stopColor="#44d8f1" stopOpacity="0" />
-                    </linearGradient>
-                  </defs>
-                  <path d={chart.area} fill="url(#chartFill)" />
-                  <path
-                    d={chart.line}
-                    fill="none"
-                    stroke="#44d8f1"
-                    strokeLinecap="round"
-                    strokeWidth="3"
-                    vectorEffect="non-scaling-stroke"
-                  />
-                </svg>
+            <div className="relative h-72 w-full">
+              {chartData.length > 0 ? (
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={chartData} margin={{ top: 8, right: 8, left: 0, bottom: 0 }}>
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      stroke="rgba(255,255,255,0.06)"
+                      vertical={false}
+                    />
+                    <XAxis
+                      dataKey="label"
+                      stroke="rgba(255,255,255,0.4)"
+                      fontSize={10}
+                      tickLine={false}
+                      axisLine={false}
+                    />
+                    <YAxis
+                      stroke="rgba(255,255,255,0.4)"
+                      fontSize={10}
+                      tickLine={false}
+                      axisLine={false}
+                      width={70}
+                      tickFormatter={(v: number) =>
+                        v === 0 ? '0' : formatCurrency(v).replace(/[ \s]/g, '')
+                      }
+                    />
+                    <Tooltip
+                      cursor={{ fill: 'rgba(255,255,255,0.04)' }}
+                      content={<CashflowTooltip />}
+                    />
+                    <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" />
+                    <Bar
+                      dataKey="income"
+                      fill="#44d8f1"
+                      radius={[4, 4, 0, 0]}
+                      maxBarSize={48}
+                    />
+                    <Bar
+                      dataKey="expenses"
+                      fill="#ffb4ab"
+                      radius={[0, 0, 4, 4]}
+                      maxBarSize={48}
+                    />
+                  </BarChart>
+                </ResponsiveContainer>
               ) : (
                 <div className="w-full h-full flex items-center justify-center bg-white/5 rounded-xl border border-dashed border-white/10">
                   <p className="text-xs text-on-surface-variant font-medium">
@@ -265,18 +329,14 @@ export default function Dashboard() {
               )}
             </div>
 
-            {cashflow?.series && cashflow.series.length > 0 && (
-              <div
-                className="mt-6 grid text-[10px] text-on-surface-variant font-bold uppercase tracking-wider"
-                style={{ gridTemplateColumns: `repeat(${cashflow.series.length}, minmax(0, 1fr))` }}
-              >
-                {cashflow.series.map((p) => (
-                  <span key={`${p.year}-${p.month}`} className="text-center">
-                    {MONTH_SHORT_DE[p.month - 1]} {String(p.year).slice(-2)}
-                  </span>
-                ))}
-              </div>
-            )}
+            <div className="flex items-center gap-6 mt-4 text-[10px] text-on-surface-variant font-bold uppercase tracking-wider">
+              <span className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-sm bg-primary" /> Einnahmen
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="w-3 h-3 rounded-sm bg-error" /> Ausgaben
+              </span>
+            </div>
           </motion.div>
 
           {latestReport && (
