@@ -446,18 +446,30 @@ export default function Dashboard() {
               animate={{ opacity: 1, y: 0 }}
               className="bg-surface-container-high p-6 rounded-2xl"
             >
-              <h3 className="font-headline font-bold text-on-surface mb-6 flex items-center gap-2">
-                <TrendingUp className="w-4 h-4 text-primary" />
-                Top Kategorien
-              </h3>
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="font-headline font-bold text-on-surface flex items-center gap-2">
+                  <TrendingUp className="w-4 h-4 text-primary" />
+                  Top Kategorien
+                </h3>
+                <Link
+                  to="/categories"
+                  className="text-xs text-primary font-bold uppercase tracking-wider hover:underline"
+                >
+                  Alle
+                </Link>
+              </div>
               <div className="space-y-4">
-                {summary.by_category.slice(0, 5).map((c, i) => {
+                {summary.by_category.slice(0, 3).map((c, i) => {
                   const maxTotal = Math.max(
-                    ...summary.by_category.map((x) => Math.abs(x.total)),
+                    ...summary.by_category.slice(0, 3).map((x) => Math.abs(x.total)),
                   );
                   const pct = maxTotal > 0 ? (Math.abs(c.total) / maxTotal) * 100 : 0;
                   return (
-                    <div key={c.category_id}>
+                    <Link
+                      key={c.category_id}
+                      to={`/transactions?category_id=${c.category_id}`}
+                      className="block hover:opacity-80 transition-opacity"
+                    >
                       <div className="flex justify-between text-[11px] font-bold text-on-surface-variant mb-2">
                         <span className="truncate pr-2">{c.category_name}</span>
                         <span className="tabular-nums shrink-0">
@@ -472,7 +484,7 @@ export default function Dashboard() {
                           className="h-full bg-primary rounded-full"
                         />
                       </div>
-                    </div>
+                    </Link>
                   );
                 })}
               </div>
