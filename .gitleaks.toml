@@ -1,0 +1,82 @@
+# gitleaks configuration for k-fin-ui (frontend)
+#
+# Two layers protect the public repo from credential / personal-data leaks:
+#   1. This file — pre-commit hook (.husky/pre-commit) runs
+#      `gitleaks protect --staged --config .gitleaks.toml`
+#   2. The same config runs in CI (.github/workflows/security.yml) so the
+#      check is enforced even if a contributor uses `git commit --no-verify`.
+
+title = "k-fin-ui gitleaks config"
+
+[extend]
+# Inherit gitleaks' default rule set (AWS, GCP, Anthropic, OpenAI, GitHub
+# tokens, JWTs, private keys, generic high-entropy strings, etc.)
+useDefault = true
+
+# ─── Custom rules tuned for k-fin-ui ──────────────────────────────────────
+
+[[rules]]
+id = "personal-domain-max5800"
+description = "Personal infrastructure domain max5800.com — must not become a default in shipped code"
+regex = '''\bmax5800\.com\b'''
+keywords = ["max5800"]
+
+[rules.allowlist]
+description = "Documentation files referencing the rule itself"
+paths = [
+    '''SECURITY\.md$''',
+    '''CHANGELOG\.md$''',
+]
+
+[[rules]]
+id = "hardcoded-vite-prod-url"
+description = "VITE_API_BASE_URL pointing at a real-looking production host (allowlist exempts localhost / *.example.* / *.local)"
+regex = '''VITE_API_BASE_URL\s*=\s*["']?(https?://[^\s"'#]+)["']?'''
+secretGroup = 1
+keywords = ["VITE_API_BASE_URL"]
+
+[rules.allowlist]
+description = "Local dev / example placeholders are safe"
+regexes = [
+    '''localhost''',
+    '''127\.0\.0\.1''',
+    '''0\.0\.0\.0''',
+    '''\.example\.(com|de|org)''',
+    '''\.localhost''',
+    '''\.local(\b|/|:)''',
+]
+
+[[rules]]
+id = "embedded-bearer-token"
+description = "Bearer token literal in source — should come from runtime config"
+# Char class excludes $, {, } so template strings like `Bearer ${token}` are
+# inherently NOT matched (Go regexp has no negative lookahead). Catches both
+# `Authorization: "Bearer xxx"` and bare `Bearer xxx` literals.
+regex = '''(?i)bearer\s+([A-Za-z0-9_\-\.]{20,})'''
+secretGroup = 1
+keywords = ["bearer", "Bearer"]
+
+# ─── Global allowlist ─────────────────────────────────────────────────────
+
+[allowlist]
+description = "Paths and patterns globally exempt from secret scanning"
+
+paths = [
+    # The config file itself contains regex patterns that look like secrets
+    '''\.gitleaks\.toml$''',
+    # Lock files have hashes that look like high-entropy strings
+    '''package-lock\.json$''',
+    '''.*\.lock$''',
+    # Build output (gitignored, but defense in depth)
+    '''dist/.*''',
+    # Personal env files (gitignored, but defense in depth) — anchored to
+    # the exact filename so test fixtures like `fake-leak.env` aren't exempted
+    '''(^|/)\.env$''',
+    '''(^|/)\.env\.local$''',
+]
+
+regexes = [
+    # Generic placeholders used in the example env file
+    '''your_[a-z_]+_here''',
+    '''change_me''',
+]
