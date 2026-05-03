@@ -28,7 +28,7 @@ Frontend für k-fin — React 19 + TypeScript + Vite.
    # optional: VITE_API_BASE_URL anpassen
    ```
 
-3. Backend starten (im `comdirect-firefly-sync` Repo):
+3. Backend starten (im `k-fin` Repo):
 
    ```bash
    uv run uvicorn main:app --reload
