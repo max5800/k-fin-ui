@@ -123,3 +123,35 @@ export function useBackfillRun(run_id: string | null) {
     },
   });
 }
+
+// ---------------------------------------------------------------------------
+// Sync run history — read-only listing for the Settings page.
+// ---------------------------------------------------------------------------
+
+export type SyncRunStatus = 'running' | 'succeeded' | 'failed';
+export type SyncRunSource = 'raw_import' | 'normalize';
+
+export interface SyncRun {
+  id: string;
+  source: SyncRunSource;
+  status: SyncRunStatus;
+  started_at: string;
+  finished_at: string | null;
+  rows_processed: number;
+  error: string | null;
+}
+
+export function useSyncRuns(limit = 20) {
+  return useQuery({
+    queryKey: ['sync-runs', limit],
+    queryFn: async () => {
+      const { data } = await apiClient.get<SyncRun[]>('/sync/runs', {
+        params: { limit },
+      });
+      return data;
+    },
+    // Auto-refresh while the user has the Settings page open. Cheap query
+    // and helps spot a sync that finishes after the user leaves the page.
+    refetchInterval: 30_000,
+  });
+}
