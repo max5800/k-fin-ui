@@ -76,3 +76,16 @@ export function useCancelRun() {
     },
   });
 }
+
+export function useRerunRun() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (run_id: string) => {
+      const { data } = await apiClient.post<Run>(`/runs/${run_id}/rerun`, {});
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.runs.all });
+    },
+  });
+}

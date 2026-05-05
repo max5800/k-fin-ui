@@ -8,6 +8,7 @@ import {
   ChevronRight,
   Loader2,
   Play,
+  RotateCcw,
   Sparkles,
   Tag,
   X,
@@ -19,6 +20,7 @@ import { useEffect, useState, type ComponentType } from 'react';
 import { createPortal } from 'react-dom';
 import {
   useCancelRun,
+  useRerunRun,
   useRuns,
   useTriggerFullPipeline,
   useTriggerRun,
@@ -139,6 +141,13 @@ export default function AgentRuns() {
     isPending: isCancelling,
     variables: cancellingId,
   } = useCancelRun();
+  const {
+    mutate: rerunRun,
+    isPending: isRerunning,
+    variables: rerunningId,
+    error: rerunError,
+    reset: resetRerun,
+  } = useRerunRun();
 
   const [pending, setPending] = useState<PendingTrigger | null>(null);
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
@@ -346,6 +355,14 @@ export default function AgentRuns() {
                     onToggleExpand={() => toggleExpand(run.id)}
                     onCancel={() => setCancelTargetId(run.id)}
                     isCancelling={isCancelling && cancellingId === run.id}
+                    onRerun={() => {
+                      resetRerun();
+                      rerunRun(run.id);
+                    }}
+                    isRerunning={isRerunning && rerunningId === run.id}
+                    rerunError={
+                      rerunError && rerunningId === run.id ? rerunError : null
+                    }
                   />
                 ))
               )}
@@ -551,6 +568,9 @@ function RunRow({
   onToggleExpand,
   onCancel,
   isCancelling,
+  onRerun,
+  isRerunning,
+  rerunError,
 }: {
   run: Run;
   estimate: number | null;
@@ -558,6 +578,9 @@ function RunRow({
   onToggleExpand: () => void;
   onCancel: () => void;
   isCancelling: boolean;
+  onRerun: () => void;
+  isRerunning: boolean;
+  rerunError: unknown;
   key?: string;
 }) {
   const status: RunStatus = run.status;
@@ -659,6 +682,24 @@ function RunRow({
                 Abbrechen
               </button>
             )}
+            {(status === 'failed' || status === 'cancelled') && (
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onRerun();
+                }}
+                disabled={isRerunning}
+                className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-md text-on-surface-variant hover:text-on-surface hover:bg-white/5 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                title="Run erneut ausführen — bereits kategorisierte Transaktionen bleiben erhalten"
+              >
+                {isRerunning ? (
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                ) : (
+                  <RotateCcw className="w-3 h-3" />
+                )}
+                Rerun
+              </button>
+            )}
             <span
               className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-bold tracking-wider uppercase border ${styleClass}`}
               title={run.error ?? undefined}
@@ -686,6 +727,21 @@ function RunRow({
                   </p>
                 ))}
               </div>
+            </div>
+          </td>
+        </tr>
+      )}
+      {rerunError !== null && rerunError !== undefined && (
+        <tr className="bg-error/5 border-l-2 border-error" role="alert">
+          <td colSpan={6} className="px-6 pb-4 pt-0">
+            <div className="flex items-start gap-2 text-xs text-error">
+              <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
+              <p className="leading-relaxed">
+                Rerun fehlgeschlagen:{' '}
+                {rerunError instanceof Error
+                  ? rerunError.message
+                  : 'Unbekannter Fehler'}
+              </p>
             </div>
           </td>
         </tr>
