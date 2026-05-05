@@ -1,3 +1,12 @@
+# [1.8.0](https://github.com/max5800/k-fin-ui/compare/v1.7.0...v1.8.0) (2026-05-05)
+
+
+### Features
+
+* **runs:** rerun button on failed/cancelled agent runs ([621c9a0](https://github.com/max5800/k-fin-ui/commit/621c9a04d23847988fa09b09b028a25392bba7bd))
+* **sync:** live-refetch while a sync is running + invalidate dependants ([5a59a8c](https://github.com/max5800/k-fin-ui/commit/5a59a8c8bc45a30507bcca6a7d899e8243c8bcd8))
+* **transactions:** csv export button ([c8ac59f](https://github.com/max5800/k-fin-ui/commit/c8ac59fcc0b677645e746528d5727c68ac51f3a4))
+
 # [1.7.0](https://github.com/max5800/k-fin-ui/compare/v1.6.0...v1.7.0) (2026-05-05)
 
 
