@@ -1,3 +1,11 @@
+# [1.7.0](https://github.com/max5800/k-fin-ui/compare/v1.6.0...v1.7.0) (2026-05-05)
+
+
+### Features
+
+* **portfolio:** multi-depot tabs in Bestandsliste ([0e231f2](https://github.com/max5800/k-fin-ui/commit/0e231f2fb190c97deebb222b40b59af7da99a323))
+* **settings:** add sync run history table ([4aef104](https://github.com/max5800/k-fin-ui/commit/4aef10491ba639109d3d3e05a836603029b371bc))
+
 # [1.6.0](https://github.com/max5800/k-fin-ui/compare/v1.5.0...v1.6.0) (2026-05-02)
 
 
