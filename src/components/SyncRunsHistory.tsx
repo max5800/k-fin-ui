@@ -1,11 +1,41 @@
+import { useEffect, useRef } from 'react';
 import { AlertCircle, CheckCircle2, History, Loader2, RefreshCw } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import { type SyncRun, type SyncRunStatus, useSyncRuns } from '../api/sync';
+import { qk } from '../lib/queryKeys';
 import { formatDate, formatRelativeDate } from '../lib/format';
+
+// Query-key prefixes that point at data which gets stale once a sync run
+// transitions from 'running' → terminal. Listed centrally so we don't drift
+// from the qk factory.
+const STALE_AFTER_SYNC_PREFIXES: readonly (readonly unknown[])[] = [
+  qk.transactions.all,
+  ['aggregates'],
+  qk.categorization.pending,
+  ['portfolio'],
+];
 
 export default function SyncRunsHistory() {
   const queryClient = useQueryClient();
   const { data: runs, isPending, isFetching, isError } = useSyncRuns(20);
+
+  // Watch the newest run. When it flips from 'running' → 'succeeded' / 'failed'
+  // there is fresh data on the backend → invalidate the dependent queries so
+  // Transactions, Aggregates, Pending-Review and Portfolio refetch on their own.
+  const prevTopStatusRef = useRef<SyncRunStatus | null>(null);
+  const topStatus = runs && runs.length > 0 ? runs[0].status : null;
+  useEffect(() => {
+    const prev = prevTopStatusRef.current;
+    if (
+      prev === 'running' &&
+      (topStatus === 'succeeded' || topStatus === 'failed')
+    ) {
+      for (const prefix of STALE_AFTER_SYNC_PREFIXES) {
+        queryClient.invalidateQueries({ queryKey: prefix });
+      }
+    }
+    prevTopStatusRef.current = topStatus;
+  }, [topStatus, queryClient]);
 
   const handleRefresh = () => {
     queryClient.invalidateQueries({ queryKey: ['sync-runs'] });

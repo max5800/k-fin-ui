@@ -141,6 +141,21 @@ export interface SyncRun {
   error: string | null;
 }
 
+// Exported for direct unit-testing — the cadence is part of the UX contract:
+// 2s while a run is in-flight, 30s otherwise. Keep these constants in step
+// with src/components/__tests__/SyncRunsHistory.test.tsx and
+// src/api/__tests__/sync.test.tsx.
+export const SYNC_RUNS_POLL_ACTIVE_MS = 2_000;
+export const SYNC_RUNS_POLL_IDLE_MS = 30_000;
+
+export function syncRunsRefetchInterval(
+  query: { state: { data: SyncRun[] | undefined } },
+): number {
+  const data = query.state.data;
+  if (data?.some((r) => r.status === 'running')) return SYNC_RUNS_POLL_ACTIVE_MS;
+  return SYNC_RUNS_POLL_IDLE_MS;
+}
+
 export function useSyncRuns(limit = 20) {
   return useQuery({
     queryKey: ['sync-runs', limit],
@@ -152,6 +167,8 @@ export function useSyncRuns(limit = 20) {
     },
     // Auto-refresh while the user has the Settings page open. Cheap query
     // and helps spot a sync that finishes after the user leaves the page.
-    refetchInterval: 30_000,
+    // While a run is in-flight we poll aggressively (2s) so the "Läuft" badge
+    // flips to terminal almost immediately; otherwise idle at 30s.
+    refetchInterval: syncRunsRefetchInterval,
   });
 }

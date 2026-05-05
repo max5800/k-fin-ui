@@ -11,13 +11,17 @@ vi.mock('../../api/sync', () => ({
   useSyncRuns: (limit?: number) => mockUseSyncRuns(limit),
 }));
 
-function renderHistory() {
-  const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  return render(
-    <QueryClientProvider client={qc}>
-      <SyncRunsHistory />
-    </QueryClientProvider>,
-  );
+function renderHistory(qc?: QueryClient) {
+  const client =
+    qc ?? new QueryClient({ defaultOptions: { queries: { retry: false } } });
+  return {
+    qc: client,
+    ...render(
+      <QueryClientProvider client={client}>
+        <SyncRunsHistory />
+      </QueryClientProvider>,
+    ),
+  };
 }
 
 const baseTime = new Date('2026-05-05T20:00:00Z').toISOString();
@@ -132,5 +136,99 @@ describe('SyncRunsHistory', () => {
     // invalidated, but we don't have a strict observable here. Click coverage
     // is enough to catch wiring breakage.
     expect(button).toBeInTheDocument();
+  });
+
+  it('invalidates dependent caches when newest run flips running → succeeded', () => {
+    // First render: newest row is running.
+    mockUseSyncRuns.mockReturnValue({
+      data: [runningRun, succeededRun],
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidateSpy = vi.spyOn(qc, 'invalidateQueries');
+    const { rerender } = renderHistory(qc);
+
+    // Mounting itself should not trigger the cross-hook invalidation — the
+    // newest row was already 'running' on first observation.
+    const initialInvalidations = invalidateSpy.mock.calls.length;
+
+    // Backend now reports the run as finished. Re-render with the flipped
+    // payload to simulate a poll tick from useSyncRuns.
+    const finishedTopRun: SyncRun = { ...runningRun, status: 'succeeded' };
+    mockUseSyncRuns.mockReturnValue({
+      data: [finishedTopRun, succeededRun],
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    });
+    rerender(
+      <QueryClientProvider client={qc}>
+        <SyncRunsHistory />
+      </QueryClientProvider>,
+    );
+
+    const newCalls = invalidateSpy.mock.calls.slice(initialInvalidations);
+    const invalidatedKeys = newCalls.map(([arg]) =>
+      JSON.stringify((arg as { queryKey: unknown[] }).queryKey),
+    );
+    expect(invalidatedKeys).toContain(JSON.stringify(['transactions']));
+    expect(invalidatedKeys).toContain(JSON.stringify(['aggregates']));
+    expect(invalidatedKeys).toContain(
+      JSON.stringify(['categorization', 'pending']),
+    );
+    expect(invalidatedKeys).toContain(JSON.stringify(['portfolio']));
+  });
+
+  it('also invalidates when newest run flips running → failed', () => {
+    mockUseSyncRuns.mockReturnValue({
+      data: [runningRun],
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidateSpy = vi.spyOn(qc, 'invalidateQueries');
+    const { rerender } = renderHistory(qc);
+    const baseline = invalidateSpy.mock.calls.length;
+
+    const failedTop: SyncRun = { ...runningRun, status: 'failed', error: 'boom' };
+    mockUseSyncRuns.mockReturnValue({
+      data: [failedTop],
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    });
+    rerender(
+      <QueryClientProvider client={qc}>
+        <SyncRunsHistory />
+      </QueryClientProvider>,
+    );
+
+    expect(invalidateSpy.mock.calls.length).toBeGreaterThan(baseline);
+  });
+
+  it('does not invalidate dependent caches on benign re-renders', () => {
+    mockUseSyncRuns.mockReturnValue({
+      data: [succeededRun, failedRun],
+      isPending: false,
+      isFetching: false,
+      isError: false,
+    });
+    const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
+    const invalidateSpy = vi.spyOn(qc, 'invalidateQueries');
+    const { rerender } = renderHistory(qc);
+    const baseline = invalidateSpy.mock.calls.length;
+
+    // Same data, just another render. Newest row is still 'succeeded' — no
+    // running → terminal transition, so no cross-hook invalidation expected.
+    rerender(
+      <QueryClientProvider client={qc}>
+        <SyncRunsHistory />
+      </QueryClientProvider>,
+    );
+
+    expect(invalidateSpy.mock.calls.length).toBe(baseline);
   });
 });
