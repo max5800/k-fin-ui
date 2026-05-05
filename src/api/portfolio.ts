@@ -1,4 +1,4 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQueries, useQuery } from '@tanstack/react-query';
 import { apiClient } from './client';
 import { qk } from '../lib/queryKeys';
 import type {
@@ -61,4 +61,28 @@ export function usePositions(depotId: string | null | undefined) {
       return data;
     },
   });
+}
+
+// Loads positions for every passed depot in parallel, keyed by depot_id.
+// Used by the Portfolio page to drive the per-depot tabs without forcing
+// a refetch when the user switches between them.
+export function useAllPositions(depots: Depot[] | undefined) {
+  const list = depots ?? [];
+  const results = useQueries({
+    queries: list.map((d) => ({
+      queryKey: qk.portfolio.positions(d.depot_id),
+      queryFn: async () => {
+        const { data } = await apiClient.get<Position[]>(`/depots/${d.depot_id}/positions`);
+        return data;
+      },
+    })),
+  });
+  const byDepotId: Record<string, Position[]> = {};
+  list.forEach((d, i) => {
+    byDepotId[d.depot_id] = results[i]?.data ?? [];
+  });
+  return {
+    byDepotId,
+    isPending: list.length > 0 && results.some((q) => q.isPending),
+  };
 }

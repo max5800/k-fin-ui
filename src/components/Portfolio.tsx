@@ -10,14 +10,17 @@ import {
 } from 'lucide-react';
 
 import {
+  useAllPositions,
   useDepots,
   usePortfolioAllocation,
   usePortfolioPerformance,
   usePortfolioSummary,
-  usePositions,
 } from '../api/portfolio';
 import { formatCurrency } from '../lib/format';
-import type { PerformancePoint, PerformanceRange, Position } from '../api/types';
+import type { Depot, PerformancePoint, PerformanceRange, Position } from '../api/types';
+
+const ALL_DEPOTS = 'all' as const;
+type DepotSelection = typeof ALL_DEPOTS | string;
 
 const RANGES: PerformanceRange[] = ['1D', '1W', '1M', '1Y', 'MAX'];
 
@@ -48,14 +51,19 @@ function buildChartPaths(series: PerformancePoint[], width = 800, height = 200) 
 
 export default function Portfolio() {
   const [range, setRange] = useState<PerformanceRange>('1Y');
+  const [selectedDepot, setSelectedDepot] = useState<DepotSelection>(ALL_DEPOTS);
 
   const { data: summary, isPending: isSummaryPending } = usePortfolioSummary();
   const { data: allocation } = usePortfolioAllocation();
   const { data: performance } = usePortfolioPerformance(range);
   const { data: depots } = useDepots();
 
-  const firstDepotId = depots?.[0]?.depot_id ?? null;
-  const { data: positions, isPending: isPositionsPending } = usePositions(firstDepotId);
+  const { byDepotId, isPending: isPositionsPending } = useAllPositions(depots);
+
+  const visiblePositions = useMemo(
+    () => selectPositions(depots, byDepotId, selectedDepot),
+    [depots, byDepotId, selectedDepot],
+  );
 
   const chart = useMemo(
     () => (performance ? buildChartPaths(performance) : null),
@@ -207,17 +215,22 @@ export default function Portfolio() {
           <div>
             <h3 className="font-headline font-bold text-on-surface text-xl">Bestandsliste</h3>
             <p className="text-xs text-on-surface-variant">
-              {depots && depots.length > 1
-                ? `Erstes Depot: ${depots[0].depot_id}`
-                : depots?.[0]?.depot_id ?? ''}
+              {bestandslisteSubtitle(depots, selectedDepot)}
             </p>
           </div>
           <div className="flex items-center gap-2 text-xs text-primary font-bold uppercase tracking-wider">
             <TrendingUp className="w-4 h-4" />
-            {positions?.length ?? 0} Positionen
+            {visiblePositions.length} Positionen
           </div>
         </div>
-        <PositionsTable positions={positions ?? []} isPending={isPositionsPending} />
+        {depots && depots.length > 1 && (
+          <DepotTabs
+            depots={depots}
+            selected={selectedDepot}
+            onSelect={setSelectedDepot}
+          />
+        )}
+        <PositionsTable positions={visiblePositions} isPending={isPositionsPending} />
       </motion.div>
     </div>
   );
@@ -376,6 +389,101 @@ function PositionsTable({
         </tbody>
       </table>
     </div>
+  );
+}
+
+function depotLabel(d: Depot, idx: number): string {
+  const t = d.depot_type?.trim();
+  return t ? t : `Depot ${idx + 1}`;
+}
+
+function bestandslisteSubtitle(
+  depots: Depot[] | undefined,
+  selected: DepotSelection,
+): string {
+  if (!depots || depots.length === 0) return '';
+  if (depots.length === 1) return depotLabel(depots[0], 0);
+  if (selected === ALL_DEPOTS) return `${depots.length} Depots zusammengefasst`;
+  const idx = depots.findIndex((d) => d.depot_id === selected);
+  return idx >= 0 ? depotLabel(depots[idx], idx) : '';
+}
+
+// When showing positions across multiple depots, the per-depot weight_pct
+// from the backend doesn't sum to 100%. Recompute against the union total so
+// the Gewichtung column stays meaningful.
+function selectPositions(
+  depots: Depot[] | undefined,
+  byDepotId: Record<string, Position[]>,
+  selected: DepotSelection,
+): Position[] {
+  if (!depots || depots.length === 0) return [];
+  if (selected !== ALL_DEPOTS) {
+    return byDepotId[selected] ?? [];
+  }
+  const union = depots.flatMap((d) => byDepotId[d.depot_id] ?? []);
+  if (depots.length <= 1) return union;
+  const total = union.reduce((sum, p) => sum + p.current_value, 0);
+  if (total <= 0) return union;
+  return union.map((p) => ({
+    ...p,
+    weight_pct: (p.current_value / total) * 100,
+  }));
+}
+
+function DepotTabs({
+  depots,
+  selected,
+  onSelect,
+}: {
+  depots: Depot[];
+  selected: DepotSelection;
+  onSelect: (next: DepotSelection) => void;
+}) {
+  return (
+    <div
+      className="px-6 py-3 flex flex-wrap gap-1 border-b border-white/5 bg-surface-container-lowest"
+      role="tablist"
+      aria-label="Depot-Auswahl"
+    >
+      <DepotTabButton
+        label="Alle Depots"
+        active={selected === ALL_DEPOTS}
+        onClick={() => onSelect(ALL_DEPOTS)}
+      />
+      {depots.map((d, i) => (
+        <DepotTabButton
+          key={d.depot_id}
+          label={depotLabel(d, i)}
+          active={selected === d.depot_id}
+          onClick={() => onSelect(d.depot_id)}
+        />
+      ))}
+    </div>
+  );
+}
+
+type DepotTabButtonProps = {
+  label: string;
+  active: boolean;
+  onClick: () => void;
+  key?: string;
+};
+
+function DepotTabButton({ label, active, onClick }: DepotTabButtonProps) {
+  return (
+    <button
+      type="button"
+      role="tab"
+      aria-selected={active}
+      onClick={onClick}
+      className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${
+        active
+          ? 'bg-primary text-on-primary'
+          : 'text-on-surface-variant hover:text-on-surface hover:bg-white/5'
+      }`}
+    >
+      {label}
+    </button>
   );
 }
 
