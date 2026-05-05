@@ -2,6 +2,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Download,
   Receipt,
   Search,
   X,
@@ -9,7 +10,11 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { useTransactions, useUpdateTransaction } from '../api/transactions';
+import {
+  downloadTransactionsCsv,
+  useTransactions,
+  useUpdateTransaction,
+} from '../api/transactions';
 import { useCategories } from '../api/categories';
 import { formatCurrency, formatDate } from '../lib/format';
 import { useForm } from 'react-hook-form';
@@ -29,6 +34,8 @@ const PAGE_SIZE = 25;
 export default function Transactions() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
+  const [isExporting, setIsExporting] = useState(false);
+  const [exportError, setExportError] = useState<string | null>(null);
 
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
   const categoryId = searchParams.get('category_id') || undefined;
@@ -85,6 +92,23 @@ export default function Transactions() {
     });
   };
 
+  const handleExportCsv = async () => {
+    setExportError(null);
+    setIsExporting(true);
+    try {
+      await downloadTransactionsCsv({
+        category_id: categoryId,
+        search: q || undefined,
+      });
+    } catch (err) {
+      setExportError(
+        err instanceof Error ? err.message : 'CSV-Export fehlgeschlagen',
+      );
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   const total = txData?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
 
@@ -127,7 +151,32 @@ export default function Transactions() {
             <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
           </div>
         </div>
+
+        <div className="md:ml-auto flex flex-col gap-1.5">
+          <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant invisible">
+            Export
+          </span>
+          <button
+            type="button"
+            onClick={handleExportCsv}
+            disabled={isExporting}
+            aria-label="Transaktionen als CSV exportieren"
+            className="bg-surface-container-low px-4 py-2.5 rounded-lg text-sm font-bold text-on-surface border border-transparent hover:border-primary/30 transition-all flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Download className="w-4 h-4" />
+            {isExporting ? 'Exportiere...' : 'CSV-Export'}
+          </button>
+        </div>
       </div>
+
+      {exportError && (
+        <div
+          role="alert"
+          className="mb-4 px-4 py-2.5 rounded-lg bg-error/10 border border-error/30 text-error text-sm font-medium"
+        >
+          {exportError}
+        </div>
+      )}
 
       <div className="flex gap-6 flex-1 overflow-hidden">
         <div className="flex-1 bg-surface-container-low rounded-2xl overflow-hidden flex flex-col border border-white/5">
