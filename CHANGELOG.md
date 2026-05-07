@@ -1,3 +1,10 @@
+# [1.9.0](https://github.com/max5800/k-fin-ui/compare/v1.8.0...v1.9.0) (2026-05-07)
+
+
+### Features
+
+* **categories:** mvp ux overhaul — coverage strip, attention rail, drawer edit ([5d06276](https://github.com/max5800/k-fin-ui/commit/5d06276c9ae42b06c8146b7fd58fc318c9c4b6d3))
+
 # [1.8.0](https://github.com/max5800/k-fin-ui/compare/v1.7.0...v1.8.0) (2026-05-05)
 
 
