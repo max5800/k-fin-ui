@@ -1,3 +1,10 @@
+# [1.12.0](https://github.com/max5800/k-fin-ui/compare/v1.11.0...v1.12.0) (2026-05-09)
+
+
+### Features
+
+* **ui:** categorization rules — settings sub-section + live regex preview ([#3](https://github.com/max5800/k-fin-ui/issues/3)) ([5005abf](https://github.com/max5800/k-fin-ui/commit/5005abf22b2301565d36c93faa56b3e45dcf8872))
+
 # [1.11.0](https://github.com/max5800/k-fin-ui/compare/v1.10.0...v1.11.0) (2026-05-09)
 
 
