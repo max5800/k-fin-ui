@@ -1,3 +1,11 @@
+# [1.10.0](https://github.com/max5800/k-fin-ui/compare/v1.9.0...v1.10.0) (2026-05-09)
+
+
+### Features
+
+* **ui:** dev tools page — wipe + seed mock dataset ([bc52d43](https://github.com/max5800/k-fin-ui/commit/bc52d43160abf2b766d4c46a0bcec84065e57841))
+* **ui:** refund-aware review, audit + budget chip ([d7c1d6b](https://github.com/max5800/k-fin-ui/commit/d7c1d6b65d110024473d14f68a96e729a77ab188))
+
 # [1.9.0](https://github.com/max5800/k-fin-ui/compare/v1.8.0...v1.9.0) (2026-05-07)
 
 
