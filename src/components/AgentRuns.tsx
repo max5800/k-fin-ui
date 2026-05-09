@@ -16,7 +16,7 @@ import {
   Zap,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useState, type ComponentType } from 'react';
+import { useEffect, useMemo, useState, type ComponentType } from 'react';
 import { createPortal } from 'react-dom';
 import {
   useCancelRun,
@@ -131,8 +131,15 @@ function estimatedSeconds(runs: Run[] | undefined, agent: string): number | null
   return Math.round(total / finished.length);
 }
 
+// We load enough rows to cover a typical month of activity for the
+// cost-tracking summary card. Anything beyond this is *not* aggregated —
+// the card is honest about that ("letzte N Runs in diesem Monat").
+const RUNS_LIST_LIMIT = 50;
+
 export default function AgentRuns() {
-  const { data: runsData, isPending: isHistoryPending } = useRuns({ limit: 20 });
+  const { data: runsData, isPending: isHistoryPending } = useRuns({
+    limit: RUNS_LIST_LIMIT,
+  });
   const { mutate: triggerRun, isPending: isTriggering, variables: triggeringAgent } =
     useTriggerRun();
   const { mutate: triggerFull, isPending: isTriggeringFull } = useTriggerFullPipeline();
@@ -196,6 +203,11 @@ export default function AgentRuns() {
     }
   };
 
+  const monthSummary = useMemo(
+    () => summarizeCurrentMonth(runsData?.items ?? []),
+    [runsData?.items],
+  );
+
   const cancelTargetRun = cancelTargetId
     ? runsData?.items.find((r) => r.id === cancelTargetId) ?? null
     : null;
@@ -252,6 +264,13 @@ export default function AgentRuns() {
           </div>
         )}
       </div>
+
+      <MonthlyCostCard
+        summary={monthSummary}
+        sampleSize={runsData?.items.length ?? 0}
+        sampleCap={RUNS_LIST_LIMIT}
+        isPending={isHistoryPending}
+      />
 
       <PeriodPicker
         value={periodDaysOverride}
@@ -1006,6 +1025,135 @@ function PeriodPicker({
       )}
       <span className="text-[10px] text-on-surface-variant ml-auto">
         Wirkt nur auf Wochen-, Monats- und Anomalie-Agent.
+      </span>
+    </div>
+  );
+}
+
+// ── Monthly cost summary ──────────────────────────────────────────────
+//
+// Aggregated *client-side* over the runs already in the table — currently
+// the most recent RUNS_LIST_LIMIT (= 50). When the user has more than 50
+// runs in the current month the card is upfront about the truncation.
+// A real server-side aggregate is out of scope for Wave 1; tracked as a
+// follow-up.
+
+type MonthSummary = {
+  runCount: number;
+  inputTokens: number;
+  outputTokens: number;
+  costUsd: number;
+};
+
+function summarizeCurrentMonth(runs: Run[]): MonthSummary {
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  let runCount = 0;
+  let inputTokens = 0;
+  let outputTokens = 0;
+  let costUsd = 0;
+  for (const run of runs) {
+    const started = new Date(run.started_at);
+    if (started.getFullYear() !== year || started.getMonth() !== month) {
+      continue;
+    }
+    runCount += 1;
+    inputTokens += run.input_tokens ?? 0;
+    outputTokens += run.output_tokens ?? 0;
+    if (run.cost_usd) {
+      const parsed = parseFloat(run.cost_usd);
+      if (Number.isFinite(parsed)) costUsd += parsed;
+    }
+  }
+  return { runCount, inputTokens, outputTokens, costUsd };
+}
+
+function formatCostUsd(value: number): string {
+  if (value === 0) return '$0';
+  if (value < 0.01) return '< $0.01';
+  return `$${value.toFixed(2)}`;
+}
+
+function MonthlyCostCard({
+  summary,
+  sampleSize,
+  sampleCap,
+  isPending,
+}: {
+  summary: MonthSummary;
+  sampleSize: number;
+  sampleCap: number;
+  isPending: boolean;
+}) {
+  const monthLabel = new Date().toLocaleDateString('de-DE', {
+    month: 'long',
+    year: 'numeric',
+  });
+  // Honest disclaimer when the run-list is at the cap — we genuinely
+  // don't know whether earlier runs in the same calendar month exist.
+  const truncated = sampleSize >= sampleCap;
+  return (
+    <section
+      aria-label="Kosten in diesem Monat"
+      className="mb-6 flex flex-wrap items-center gap-x-8 gap-y-3 bg-surface-container-low rounded-2xl border border-white/5 px-6 py-4"
+    >
+      <div>
+        <span className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          {monthLabel}
+        </span>
+        <span className="text-xs text-on-surface-variant">
+          Diesen Monat
+        </span>
+      </div>
+      <Stat
+        label="Runs"
+        value={isPending ? '…' : String(summary.runCount)}
+      />
+      <Stat
+        label="Tokens"
+        value={
+          isPending
+            ? '…'
+            : formatTokens(summary.inputTokens + summary.outputTokens)
+        }
+      />
+      <Stat
+        label="Kosten"
+        value={isPending ? '…' : formatCostUsd(summary.costUsd)}
+        emphasize
+      />
+      <p className="ml-auto text-[10px] text-on-surface-variant max-w-[280px] leading-snug">
+        {truncated
+          ? `Aggregat über die letzten ${sampleCap} Runs — ältere Runs in diesem Monat fehlen.`
+          : 'Aggregat über alle Runs in der Liste, client-seitig berechnet.'}
+      </p>
+    </section>
+  );
+}
+
+function Stat({
+  label,
+  value,
+  emphasize,
+}: {
+  label: string;
+  value: string;
+  emphasize?: boolean;
+}) {
+  return (
+    <div>
+      <span className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+        {label}
+      </span>
+      <span
+        className={`block tabular-nums ${
+          emphasize
+            ? 'text-xl font-extrabold text-primary'
+            : 'text-lg font-bold text-on-surface'
+        }`}
+      >
+        {value}
       </span>
     </div>
   );
