@@ -4,9 +4,11 @@ import { apiClient } from './client';
 // `/dev/status` is always reachable; the destructive endpoints 404 on
 // production builds because the backend doesn't mount them. The UI uses
 // this to decide whether to render the "Dev Tools" sidebar entry at all.
+// The backend deliberately omits `app_env` from this payload so the
+// deployment environment never leaks to the client (k-fin
+// src/api/routers/dev.py::DevStatus).
 export interface DevStatus {
   enabled: boolean;
-  app_env: string;
 }
 
 export interface WipeResult {
