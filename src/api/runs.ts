@@ -38,11 +38,28 @@ export function useRun(id: string) {
   });
 }
 
+// Args for the trigger mutations. `period_days` overrides the agent's
+// built-in time window; backend (k-fin v1.34) clamps to [1, 3650] and
+// forwards it to weekly/monthly/anomaly only — categorization and
+// synthesis ignore it. Omit to keep the agent's default.
+export type TriggerSingleArgs = {
+  agent_name: string;
+  period_days?: number;
+};
+
+export type TriggerFullArgs = {
+  period_days?: number;
+};
+
 export function useTriggerRun() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (agent_name: string) => {
-      const { data } = await apiClient.post<Run>(`/runs/${agent_name}`, { trigger: 'manual' });
+    mutationFn: async ({ agent_name, period_days }: TriggerSingleArgs) => {
+      const { data } = await apiClient.post<Run>(
+        `/runs/${agent_name}`,
+        { trigger: 'manual' },
+        period_days !== undefined ? { params: { period_days } } : undefined,
+      );
       return data;
     },
     onSuccess: () => {
@@ -54,8 +71,13 @@ export function useTriggerRun() {
 export function useTriggerFullPipeline() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async () => {
-      const { data } = await apiClient.post<Run>('/runs/full', { trigger: 'manual' });
+    mutationFn: async (args: TriggerFullArgs = {}) => {
+      const { period_days } = args;
+      const { data } = await apiClient.post<Run>(
+        '/runs/full',
+        { trigger: 'manual' },
+        period_days !== undefined ? { params: { period_days } } : undefined,
+      );
       return data;
     },
     onSuccess: () => {

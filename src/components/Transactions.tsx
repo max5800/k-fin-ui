@@ -19,6 +19,7 @@ import {
   useUpdateTransaction,
 } from '../api/transactions';
 import { useCategories, useTags } from '../api/categories';
+import { useSettings } from '../api/settings';
 import { formatCurrency, formatDate } from '../lib/format';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -42,13 +43,23 @@ function parseFlag(v: string | null): FlagQuery {
   return v === 'true' || v === 'false' ? v : undefined;
 }
 
-const PAGE_SIZE = 25;
+// Fallback when /settings hasn't loaded yet — matches PAGE_SIZE_DEFAULT in
+// src/api/routers/settings.py so the very-first paint stays consistent
+// with the eventual server value.
+const DEFAULT_PAGE_SIZE = 25;
 
 export default function Transactions() {
   const [searchParams, setSearchParams] = useSearchParams();
   const [selectedTx, setSelectedTx] = useState<Transaction | null>(null);
   const [isExporting, setIsExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+
+  // Page size is driven by app_settings.page_size (server-side, persisted).
+  // Until the settings query resolves we render with the default — same value
+  // the backend uses, so paging math stays consistent across the very brief
+  // initial render.
+  const { data: settingsData } = useSettings();
+  const pageSize = settingsData?.page_size ?? DEFAULT_PAGE_SIZE;
 
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
   const categoryId = searchParams.get('category_id') || undefined;
@@ -64,10 +75,10 @@ export default function Transactions() {
     () => tagIdsParam.split(',').map((s) => s.trim()).filter(Boolean),
     [tagIdsParam],
   );
-  const offset = (page - 1) * PAGE_SIZE;
+  const offset = (page - 1) * pageSize;
 
   const { data: txData, isPending: isTxsPending } = useTransactions({
-    limit: PAGE_SIZE,
+    limit: pageSize,
     offset,
     category_id: categoryId,
     tag_ids: selectedTagIds.length > 0 ? selectedTagIds : undefined,
@@ -151,7 +162,7 @@ export default function Transactions() {
   };
 
   const total = txData?.total ?? 0;
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
 
   const setTagIds = (ids: string[]) => {
     setSearchParams((prev) => {
@@ -404,7 +415,7 @@ export default function Transactions() {
           <div className="p-4 bg-surface-container/30 border-t border-white/5 flex items-center justify-between">
             <span className="text-xs text-on-surface-variant">
               {total > 0
-                ? `${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} von ${total}`
+                ? `${offset + 1}–${Math.min(offset + pageSize, total)} von ${total}`
                 : 'Keine Ergebnisse'}
             </span>
             <div className="flex gap-2">
