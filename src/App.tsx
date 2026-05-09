@@ -8,6 +8,7 @@ import ProtectedRoute from './components/ProtectedRoute';
 import AgentRuns from './components/AgentRuns';
 import Categories from './components/Categories';
 import Dashboard from './components/Dashboard';
+import DevTools from './components/DevTools';
 import Login from './components/Login';
 import Onboarding from './components/Onboarding';
 import PendingReview from './components/PendingReview';
@@ -72,6 +73,7 @@ export default function App() {
                 />
                 <Route path="reports" element={<Reports />} />
                 <Route path="settings" element={<Settings />} />
+                <Route path="dev" element={<DevTools />} />
               </Route>
             </Route>
 

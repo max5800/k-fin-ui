@@ -4,6 +4,7 @@ import {
   TrendingUp,
   Tags,
   FileText,
+  FlaskConical,
   HelpCircle,
   Sparkles,
   Settings as SettingsIcon,
@@ -12,11 +13,13 @@ import {
 import { NavLink, useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { usePendingSuggestions } from '../api/categorization';
+import { useDevStatus } from '../api/dev';
 
 export default function Sidebar() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: pending } = usePendingSuggestions();
+  const { data: devStatus } = useDevStatus();
   // Sidebar surfaces only the *urgent* review stream — agent suggestions
   // waiting on the user. Refund-audit candidates are an opt-in cleanup
   // workflow (count is shown inside the page on its own tab) and would
@@ -32,6 +35,9 @@ export default function Sidebar() {
     { to: '/review', label: 'Review', icon: HelpCircle, badge: reviewBadge },
     { to: '/reports', label: 'Reports', icon: FileText },
     { to: '/settings', label: 'Einstellungen', icon: SettingsIcon },
+    ...(devStatus?.enabled
+      ? [{ to: '/dev', label: 'Dev Tools', icon: FlaskConical }]
+      : []),
   ];
 
   const handleLogout = () => {
