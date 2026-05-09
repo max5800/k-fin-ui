@@ -1,3 +1,10 @@
+## [1.12.1](https://github.com/max5800/k-fin-ui/compare/v1.12.0...v1.12.1) (2026-05-09)
+
+
+### Bug Fixes
+
+* **transactions:** server-side tag_ids filter + drop app_env leak vector ([#4](https://github.com/max5800/k-fin-ui/issues/4)) ([e6528c4](https://github.com/max5800/k-fin-ui/commit/e6528c4234a6d32e0b1a00bb38bb6434d2a7063f))
+
 # [1.12.0](https://github.com/max5800/k-fin-ui/compare/v1.11.0...v1.12.0) (2026-05-09)
 
 
