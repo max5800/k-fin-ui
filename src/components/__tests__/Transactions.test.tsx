@@ -118,4 +118,79 @@ describe('Transactions — CSV-Export-Button', () => {
       expect(screen.getByRole('alert')).toHaveTextContent(/server kaputt/i);
     });
   });
+
+  it('passes tag_ids from the URL to the export helper', async () => {
+    const user = userEvent.setup();
+    renderTransactions(['/transactions?tag_ids=tag-a,tag-b']);
+
+    await user.click(
+      screen.getByRole('button', { name: /transaktionen als csv exportieren/i }),
+    );
+
+    await waitFor(() => {
+      expect(downloadTransactionsCsv).toHaveBeenCalledTimes(1);
+    });
+    expect(downloadTransactionsCsv).toHaveBeenCalledWith({
+      category_id: undefined,
+      tag_ids: ['tag-a', 'tag-b'],
+      search: undefined,
+    });
+  });
+});
+
+describe('Transactions — server-side tag filter', () => {
+  beforeEach(() => {
+    vi.mocked(useUpdateTransaction).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdateTransaction>);
+    vi.mocked(useCategories).mockReturnValue({
+      data: [{ id: 'groceries', name: 'Lebensmittel', type: 'variabel' }],
+    } as unknown as ReturnType<typeof useCategories>);
+    vi.mocked(useTags).mockReturnValue({
+      data: [
+        { id: 'tag-a', name: 'urlaub' },
+        { id: 'tag-b', name: 'business' },
+      ],
+    } as unknown as ReturnType<typeof useTags>);
+    vi.mocked(downloadTransactionsCsv).mockResolvedValue(undefined);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('forwards selectedTagIds to useTransactions and trusts the server total', () => {
+    vi.mocked(useTransactions).mockReturnValue({
+      data: { items: [sampleTx], total: 8, limit: 25, offset: 0 },
+      isPending: false,
+    } as unknown as ReturnType<typeof useTransactions>);
+
+    renderTransactions(['/transactions?tag_ids=tag-a,tag-b']);
+
+    expect(useTransactions).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tag_ids: ['tag-a', 'tag-b'],
+        limit: 25,
+        offset: 0,
+      }),
+    );
+    // Footer reflects the server-reported total — no client-side filter
+    // post-step that would mislead the page count.
+    expect(screen.getByText(/von\s+8/)).toBeInTheDocument();
+    expect(screen.queryByText(/mit Tag-Filter/)).not.toBeInTheDocument();
+  });
+
+  it('omits tag_ids from the query when no tags are selected', () => {
+    vi.mocked(useTransactions).mockReturnValue({
+      data: { items: [sampleTx], total: 1, limit: 25, offset: 0 },
+      isPending: false,
+    } as unknown as ReturnType<typeof useTransactions>);
+
+    renderTransactions(['/transactions']);
+
+    expect(useTransactions).toHaveBeenCalledWith(
+      expect.objectContaining({ tag_ids: undefined }),
+    );
+  });
 });

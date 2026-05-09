@@ -2,7 +2,10 @@ export type TxFilters = {
   from?: string;
   to?: string;
   category_id?: string;
-  tag_id?: string;
+  // Multi-tag OR-filter. FastAPI accepts repeated `?tag_ids=a&tag_ids=b`;
+  // axios serializes the array via `paramsSerializer: { indexes: null }`
+  // configured on `apiClient`.
+  tag_ids?: string[];
   search?: string;
   limit?: number;
   offset?: number;

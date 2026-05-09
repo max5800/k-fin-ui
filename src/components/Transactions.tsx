@@ -55,18 +55,14 @@ export default function Transactions() {
   const q = searchParams.get('q') || '';
   const isRefundFilter = parseFlag(searchParams.get('is_refund'));
   const internalTransferFilter = parseFlag(searchParams.get('internal_transfer'));
-  // Multi-Tag-Filter: ?tag_ids=a,b,c — kommt als CSV in der URL, wird hier
-  // in ein Set für O(1)-Lookups verwandelt. Bewusst client-side, weil
-  // GET /transactions noch keinen tag-Query-Param unterstützt
-  // (siehe k-fin/src/api/routers/transactions.py::list_transactions).
+  // Multi-Tag-Filter: ?tag_ids=a,b,c — kommt als CSV in der URL, wird ans
+  // Backend als wiederholter Query-Param weitergereicht
+  // (?tag_ids=a&tag_ids=b, OR-Semantik). Server-seitig gefiltert seit
+  // k-fin v1.34, daher steckt der Filter im Query-Key und im total-Count.
   const tagIdsParam = searchParams.get('tag_ids') || '';
   const selectedTagIds = useMemo(
     () => tagIdsParam.split(',').map((s) => s.trim()).filter(Boolean),
     [tagIdsParam],
-  );
-  const selectedTagIdSet = useMemo(
-    () => new Set(selectedTagIds),
-    [selectedTagIds],
   );
   const offset = (page - 1) * PAGE_SIZE;
 
@@ -74,6 +70,7 @@ export default function Transactions() {
     limit: PAGE_SIZE,
     offset,
     category_id: categoryId,
+    tag_ids: selectedTagIds.length > 0 ? selectedTagIds : undefined,
     search: q || undefined,
     is_refund: isRefundFilter,
     internal_transfer: internalTransferFilter,
@@ -82,17 +79,7 @@ export default function Transactions() {
   const { data: tags } = useTags();
   const { mutate: updateTx, isPending: isUpdating } = useUpdateTransaction();
 
-  // Client-side Tag-Filter: erst nach dem Fetch anwenden, da Backend
-  // (noch) nicht filtert. Folge: kann pro Seite weniger Treffer als
-  // PAGE_SIZE liefern. Wenn Tag-Filter aktiv ist, surfacen wir das im
-  // Footer ("X von Y auf dieser Seite gefiltert").
-  const visibleItems = useMemo(() => {
-    if (!txData?.items) return [];
-    if (selectedTagIdSet.size === 0) return txData.items;
-    return txData.items.filter((tx) =>
-      tx.tags?.some((t) => selectedTagIdSet.has(t.id)),
-    );
-  }, [txData, selectedTagIdSet]);
+  const visibleItems = txData?.items ?? [];
 
   const {
     register,
@@ -151,6 +138,7 @@ export default function Transactions() {
     try {
       await downloadTransactionsCsv({
         category_id: categoryId,
+        tag_ids: selectedTagIds.length > 0 ? selectedTagIds : undefined,
         search: q || undefined,
       });
     } catch (err) {
@@ -177,7 +165,7 @@ export default function Transactions() {
     });
   };
   const toggleTag = (id: string) => {
-    if (selectedTagIdSet.has(id)) {
+    if (selectedTagIds.includes(id)) {
       setTagIds(selectedTagIds.filter((x) => x !== id));
     } else {
       setTagIds([...selectedTagIds, id]);
@@ -328,9 +316,7 @@ export default function Transactions() {
                 ) : visibleItems.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center py-16 text-on-surface-variant text-sm">
-                      {selectedTagIds.length > 0 && (txData?.items.length ?? 0) > 0
-                        ? 'Keine Transaktionen mit den gewählten Tags auf dieser Seite'
-                        : 'Keine Transaktionen gefunden'}
+                      Keine Transaktionen gefunden
                     </td>
                   </tr>
                 ) : (
@@ -418,9 +404,7 @@ export default function Transactions() {
           <div className="p-4 bg-surface-container/30 border-t border-white/5 flex items-center justify-between">
             <span className="text-xs text-on-surface-variant">
               {total > 0
-                ? selectedTagIds.length > 0
-                  ? `${visibleItems.length} mit Tag-Filter · ${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} von ${total}`
-                  : `${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} von ${total}`
+                ? `${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} von ${total}`
                 : 'Keine Ergebnisse'}
             </span>
             <div className="flex gap-2">

@@ -88,9 +88,6 @@ export default function DevTools() {
       <div className="flex items-center gap-3 mb-2">
         <FlaskConical className="w-7 h-7 text-amber-400" />
         <h1 className="text-2xl font-headline font-bold">Dev Tools</h1>
-        <span className="text-xs uppercase tracking-wider px-2 py-0.5 rounded bg-amber-400/10 text-amber-300 border border-amber-400/30">
-          {status.data.app_env}
-        </span>
       </div>
       <p className="text-sm text-on-surface-variant mb-8">
         Nur auf der Dev-Stage verfügbar. Diese Aktionen verändern die Datenbank
