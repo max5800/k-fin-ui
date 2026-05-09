@@ -46,6 +46,7 @@ const DECIMAL_FIELDS = new Set([
   'quantity',
   'price',
   'value',
+  'close',
 ]);
 
 function parseDecimals(data: unknown): unknown {

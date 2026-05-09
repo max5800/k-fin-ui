@@ -65,5 +65,14 @@ export const qk = {
     depots: ['portfolio', 'depots'] as const,
     positions: (depotId: string | null) =>
       ['portfolio', 'positions', depotId] as const,
+    // Cached daily close-prices for one instrument over an optional
+    // date window. ``from`` / ``to`` are ISO date strings (yyyy-MM-dd)
+    // or ``null`` for an open-ended range.
+    prices: (isin: string, from: string | null, to: string | null) =>
+      ['portfolio', 'prices', isin, from, to] as const,
+    // Whole-instrument cache key family — used as an invalidation root
+    // after PATCH ticker_symbol or POST backfill-prices, so every prices
+    // query for that ISIN refetches regardless of date window.
+    instrument: (isin: string) => ['portfolio', 'instrument', isin] as const,
   },
 } as const;

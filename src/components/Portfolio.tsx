@@ -18,6 +18,7 @@ import {
 } from '../api/portfolio';
 import { formatCurrency } from '../lib/format';
 import type { Depot, PerformancePoint, PerformanceRange, Position } from '../api/types';
+import PositionDetailPanel from './PositionDetailPanel';
 
 const ALL_DEPOTS = 'all' as const;
 type DepotSelection = typeof ALL_DEPOTS | string;
@@ -52,6 +53,10 @@ function buildChartPaths(series: PerformancePoint[], width = 800, height = 200) 
 export default function Portfolio() {
   const [range, setRange] = useState<PerformanceRange>('1Y');
   const [selectedDepot, setSelectedDepot] = useState<DepotSelection>(ALL_DEPOTS);
+  // Drill-down side-panel state. We keep the full Position object around
+  // (rather than just an ISIN) so the panel header can render header
+  // values immediately without waiting for a re-fetch.
+  const [drilldown, setDrilldown] = useState<Position | null>(null);
 
   const { data: summary, isPending: isSummaryPending } = usePortfolioSummary();
   const { data: allocation } = usePortfolioAllocation();
@@ -64,6 +69,19 @@ export default function Portfolio() {
     () => selectPositions(depots, byDepotId, selectedDepot),
     [depots, byDepotId, selectedDepot],
   );
+
+  // After a refetch, the Position reference identity changes — re-pick the
+  // updated row by ISIN+depot so the side-panel reflects fresh ticker /
+  // value data without forcing the user to reopen it.
+  const drilldownLive = useMemo(() => {
+    if (!drilldown) return null;
+    const match = visiblePositions.find(
+      (p) =>
+        p.depot_id === drilldown.depot_id &&
+        p.instrument.isin === drilldown.instrument.isin,
+    );
+    return match ?? drilldown;
+  }, [drilldown, visiblePositions]);
 
   const chart = useMemo(
     () => (performance ? buildChartPaths(performance) : null),
@@ -230,8 +248,20 @@ export default function Portfolio() {
             onSelect={setSelectedDepot}
           />
         )}
-        <PositionsTable positions={visiblePositions} isPending={isPositionsPending} />
+        <PositionsTable
+          positions={visiblePositions}
+          isPending={isPositionsPending}
+          onSelect={setDrilldown}
+          selectedKey={
+            drilldown ? `${drilldown.depot_id}:${drilldown.instrument.isin}` : null
+          }
+        />
       </motion.div>
+
+      <PositionDetailPanel
+        position={drilldownLive}
+        onClose={() => setDrilldown(null)}
+      />
     </div>
   );
 }
@@ -298,9 +328,13 @@ function KpiCard({ label, value, hint, icon: Icon, tone, pending }: KpiCardProps
 function PositionsTable({
   positions,
   isPending,
+  onSelect,
+  selectedKey,
 }: {
   positions: Position[];
   isPending: boolean;
+  onSelect: (position: Position) => void;
+  selectedKey: string | null;
 }) {
   if (isPending) {
     return (
@@ -344,8 +378,27 @@ function PositionsTable({
           </tr>
         </thead>
         <tbody className="divide-y divide-white/5">
-          {positions.map((p) => (
-            <tr key={`${p.depot_id}:${p.instrument.isin}`} className="hover:bg-white/5 transition-colors">
+          {positions.map((p) => {
+            const rowKey = `${p.depot_id}:${p.instrument.isin}`;
+            const active = rowKey === selectedKey;
+            return (
+            <tr
+              key={rowKey}
+              onClick={() => onSelect(p)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  onSelect(p);
+                }
+              }}
+              tabIndex={0}
+              role="button"
+              aria-label={`Details: ${p.instrument.name || p.instrument.isin}`}
+              aria-pressed={active}
+              className={`cursor-pointer hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-inset ${
+                active ? 'bg-white/5' : ''
+              }`}
+            >
               <td className="py-4 px-6">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-full bg-surface-container-lowest flex items-center justify-center border border-white/10 text-on-surface font-bold text-xs">
@@ -385,7 +438,8 @@ function PositionsTable({
                 {formatPercent(p.weight_pct, 1)}
               </td>
             </tr>
-          ))}
+            );
+          })}
         </tbody>
       </table>
     </div>
