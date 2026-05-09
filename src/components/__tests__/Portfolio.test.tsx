@@ -27,6 +27,7 @@ const makePosition = (depotId: string, isin: string, value: number, weight: numb
     name: `Instrument ${isin}`,
     instrument_type: 'SHARE',
     currency: 'EUR',
+    ticker_symbol: null,
   },
   quantity: 1,
   current_price: value,
@@ -89,6 +90,11 @@ vi.mock('../../api/portfolio', () => ({
     ),
     isPending: false,
   }),
+  // Drill-down panel hooks — return inert defaults; the panel mounts
+  // only after a row click (covered in the click-to-open test below).
+  useInstrumentPrices: () => ({ data: [], isPending: false }),
+  usePatchInstrument: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useBackfillPrices: () => ({ mutateAsync: vi.fn(), isPending: false }),
 }));
 
 function renderPortfolio() {
@@ -136,5 +142,37 @@ describe('Portfolio multi-depot', () => {
     await user.click(screen.getByRole('tab', { name: 'Depot 2' }));
     expect(screen.queryByText('Instrument DE000ABC123')).not.toBeInTheDocument();
     expect(screen.getByText('Instrument DE000XYZ789')).toBeInTheDocument();
+  });
+
+  it('opens the drill-down panel when a position row is clicked', async () => {
+    depotsMock = oneDepot;
+    const user = userEvent.setup();
+    renderPortfolio();
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    await user.click(
+      screen.getByRole('button', { name: /details:.*Instrument DE000ABC123/i }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    // The form input + the Save button are the two unambiguous panel
+    // affordances; the section heading shares the label string.
+    expect(within(dialog).getByRole('textbox', { name: 'Ticker-Symbol' })).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: /speichern/i })).toBeInTheDocument();
+    // The dialog title carries the position name.
+    expect(dialog).toHaveAccessibleName(/Instrument DE000ABC123/);
+  });
+
+  it('closes the drill-down panel via the close button', async () => {
+    depotsMock = oneDepot;
+    const user = userEvent.setup();
+    renderPortfolio();
+    await user.click(
+      screen.getByRole('button', { name: /details:.*Instrument DE000ABC123/i }),
+    );
+    const dialog = await screen.findByRole('dialog');
+    await user.click(within(dialog).getByRole('button', { name: 'Schließen' }));
+    // motion's exit animation removes the dialog asynchronously.
+    await vi.waitFor(() => {
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+    });
   });
 });

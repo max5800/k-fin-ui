@@ -268,6 +268,33 @@ export type Instrument = {
   name: string;
   instrument_type: string | null;
   currency: string;
+  // Manually-mapped Yahoo Finance ticker (e.g. ``AAPL``, ``SAP.DE``). Set
+  // via ``PATCH /portfolio/instruments/{isin}`` and required before
+  // ``POST .../backfill-prices`` can fetch price history.
+  ticker_symbol: string | null;
+};
+
+// Single daily close-price point from
+// ``GET /portfolio/instruments/{isin}/prices``. Mirrors
+// ``InstrumentPricePointOut`` in src/api/schemas.py.
+export type InstrumentPricePoint = {
+  price_date: string;
+  close: number;
+  currency: string;
+  source: string;
+};
+
+// Result of ``POST /portfolio/instruments/{isin}/backfill-prices``.
+// Mirrors ``PriceBackfillResult`` in src/api/schemas.py.
+export type PriceBackfillResult = {
+  isin: string;
+  ticker_symbol: string;
+  requested_from: string;
+  requested_to: string;
+  fetched_points: number;
+  inserted_points: number;
+  skipped_existing: number;
+  source: string;
 };
 
 export type Position = {
