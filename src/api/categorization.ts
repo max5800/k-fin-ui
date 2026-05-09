@@ -16,13 +16,20 @@ export function usePendingSuggestions() {
 export function useAcceptSuggestion() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async (args: { transaction_id: string; category_id?: string }) => {
-      const body = args.category_id ? { category_id: args.category_id } : {};
+    mutationFn: async (args: {
+      transaction_id: string;
+      category_id?: string;
+      is_refund?: boolean;
+    }) => {
+      const body: Record<string, unknown> = {};
+      if (args.category_id) body.category_id = args.category_id;
+      if (args.is_refund !== undefined) body.is_refund = args.is_refund;
       await apiClient.post(`/categorization/pending/${args.transaction_id}/accept`, body);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.categorization.pending });
       queryClient.invalidateQueries({ queryKey: qk.transactions.all });
+      queryClient.invalidateQueries({ queryKey: ['aggregates'] });
     },
   });
 }

@@ -17,7 +17,11 @@ export default function Sidebar() {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { data: pending } = usePendingSuggestions();
-  const pendingCount = pending?.items.length ?? 0;
+  // Sidebar surfaces only the *urgent* review stream — agent suggestions
+  // waiting on the user. Refund-audit candidates are an opt-in cleanup
+  // workflow (count is shown inside the page on its own tab) and would
+  // otherwise drown the badge with low-urgency Altlasten.
+  const reviewBadge = pending?.items.length ?? 0;
 
   const menuItems = [
     { to: '/', label: 'Dashboard', icon: LayoutGrid, end: true },
@@ -25,7 +29,7 @@ export default function Sidebar() {
     { to: '/portfolio', label: 'Portfolio', icon: TrendingUp },
     { to: '/categories', label: 'Kategorien', icon: Tags },
     { to: '/agents', label: 'Agents', icon: Sparkles },
-    { to: '/review', label: 'Review', icon: HelpCircle, badge: pendingCount },
+    { to: '/review', label: 'Review', icon: HelpCircle, badge: reviewBadge },
     { to: '/reports', label: 'Reports', icon: FileText },
     { to: '/settings', label: 'Einstellungen', icon: SettingsIcon },
   ];

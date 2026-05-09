@@ -32,6 +32,7 @@ export type Transaction = {
   is_recurring: boolean;
   is_outlier: boolean;
   internal_transfer: boolean;
+  is_refund: boolean;
   created_at: string;
   updated_at: string;
 };
@@ -99,6 +100,7 @@ export type PendingSuggestion = {
   suggested_category_name: string | null;
   confidence: number;
   reasoning: string;
+  is_refund: boolean;
 };
 
 export type PendingResponse = {

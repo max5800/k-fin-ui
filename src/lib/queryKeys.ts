@@ -6,6 +6,11 @@ export type TxFilters = {
   search?: string;
   limit?: number;
   offset?: number;
+  // Tri-state booleans encoded as 'true' | 'false' strings — matches the
+  // shape FastAPI accepts on `?is_refund=true|false` and lets us round-trip
+  // through URLSearchParams without losing 'undefined' as 'all'.
+  is_refund?: 'true' | 'false';
+  internal_transfer?: 'true' | 'false';
 };
 
 export type RunFilters = {

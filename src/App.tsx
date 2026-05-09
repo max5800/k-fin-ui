@@ -64,6 +64,12 @@ export default function App() {
                 <Route path="budgets" element={<Navigate to="/categories" replace />} />
                 <Route path="agents" element={<AgentRuns />} />
                 <Route path="review" element={<PendingReview />} />
+                {/* Old standalone refund-audit page → merged into Review tabs.
+                    Bookmarks land on the right tab via ?tab=refunds. */}
+                <Route
+                  path="refund-audit"
+                  element={<Navigate to="/review?tab=refunds" replace />}
+                />
                 <Route path="reports" element={<Reports />} />
                 <Route path="settings" element={<Settings />} />
               </Route>

@@ -116,16 +116,31 @@ export function useTransaction(id: string) {
   });
 }
 
+export type TransactionPatch = {
+  id: string;
+  category_id?: string | null;
+  tags?: string[];
+  is_refund?: boolean;
+  internal_transfer?: boolean;
+  // True stamps the row as audit-decided; false clears the stamp so the
+  // candidate re-surfaces in /review#refunds. Independent of is_refund.
+  refund_audit_decided?: boolean;
+};
+
 export function useUpdateTransaction() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: async ({ id, ...data }: { id: string; category_id?: string | null; tags?: string[] }) => {
+    mutationFn: async ({ id, ...data }: TransactionPatch) => {
       const { data: updated } = await apiClient.patch<Transaction>(`/transactions/${id}`, data);
       return updated;
     },
     onSuccess: (data) => {
+      // Aggregate views (cashflow, monthly summary, budget spending,
+      // refund audit) all derive from the same row — invalidate broadly so
+      // the dashboard refreshes after a refund/transfer reclassification.
       queryClient.invalidateQueries({ queryKey: qk.transactions.all });
       queryClient.invalidateQueries({ queryKey: qk.transactions.detail(data.id) });
+      queryClient.invalidateQueries({ queryKey: ['aggregates'] });
     },
   });
 }

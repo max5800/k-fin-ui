@@ -49,6 +49,7 @@ const sampleTx: Transaction = {
   is_recurring: false,
   is_outlier: false,
   internal_transfer: false,
+  is_refund: false,
   created_at: '2026-04-10T00:00:00Z',
   updated_at: '2026-04-10T00:00:00Z',
 };

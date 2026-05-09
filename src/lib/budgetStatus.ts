@@ -14,6 +14,12 @@ export type BudgetRow = {
   spent: number;
   txCount: number;
   budget: Budget | null;
+  // Refund-aware breakdown (optional — only set for budgeted categories
+  // sourced from /aggregates/budget-spending). `refunded` is the positive
+  // sum of is_refund=True transactions, `spentGross` the negative sum of
+  // original expenses.
+  refunded?: number;
+  spentGross?: number;
 };
 
 export function classifyTier(row: BudgetRow): BudgetTier {

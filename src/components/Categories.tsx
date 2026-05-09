@@ -24,7 +24,7 @@ import {
   useCategories,
   useUpsertBudget,
 } from '../api/categories';
-import { useMonthlySummary } from '../api/aggregates';
+import { useBudgetSpending, useMonthlySummary } from '../api/aggregates';
 import { formatCurrency } from '../lib/format';
 import type { Budget, CategoryBreakdown } from '../api/types';
 import {
@@ -66,6 +66,9 @@ export default function Categories() {
   const { data: summary } = useMonthlySummary(selected.year, selected.month);
   const { data: categories, isPending } = useCategories();
   const { data: budgets } = useBudgets();
+  // Refund-aware per-budget spend: lets us surface "Apotheke 50 € − Krankenkasse-
+  // Erstattung 30 € = 20 € netto verbraucht" instead of only the netted total.
+  const { data: budgetSpending } = useBudgetSpending(selected.year, selected.month);
   const { mutate: upsertBudget, isPending: isSaving } = useUpsertBudget();
 
   const monthLabel = `${MONTH_LONG_DE[selected.month - 1]} ${selected.year}`;
@@ -82,18 +85,41 @@ export default function Categories() {
     for (const b of budgets ?? []) {
       budgetByCat.set(b.category_id, b);
     }
+    // /budget-spending is refund-aware and authoritative for budgeted
+    // categories — its `spent_net` already nets refunds against expenses,
+    // and we surface `refunded` separately so the UI can show the split.
+    const spendingByCat = new Map<string, { gross: number; refunded: number; net: number; count: number }>();
+    for (const item of budgetSpending?.items ?? []) {
+      spendingByCat.set(item.category_id, {
+        gross: item.spent_gross,
+        refunded: item.refunded,
+        net: item.spent_net,
+        count: item.transaction_count,
+      });
+    }
     return categories.map<BudgetRow>((c) => {
-      const b = breakdownByCat.get(c.id);
+      const breakdown = breakdownByCat.get(c.id);
+      const spending = spendingByCat.get(c.id);
+      // Prefer the refund-aware figure for budgeted rows; fall back to the
+      // monthly-summary breakdown for unbudgeted categories so the rest of
+      // the page (uncategorized tally, idle categories) keeps working.
+      const spent = spending
+        ? Math.abs(spending.net)
+        : breakdown
+          ? Math.abs(breakdown.total)
+          : 0;
       return {
         id: c.id,
         name: c.name,
         type: c.type,
-        spent: b ? Math.abs(b.total) : 0,
-        txCount: b?.transaction_count ?? 0,
+        spent,
+        txCount: spending?.count ?? breakdown?.transaction_count ?? 0,
         budget: budgetByCat.get(c.id) ?? null,
+        refunded: spending?.refunded,
+        spentGross: spending ? Math.abs(spending.gross) : undefined,
       };
     });
-  }, [categories, summary, budgets]);
+  }, [categories, summary, budgets, budgetSpending]);
 
   const expenseRows = useMemo(
     () => rows.filter((r) => r.type !== 'income'),
@@ -607,6 +633,16 @@ function CategoryCard({ row, isSelected, onEdit }: CategoryCardProps) {
           {row.txCount} Transaktion{row.txCount === 1 ? '' : 'en'}
         </p>
       </Link>
+
+      {row.refunded && row.refunded > 0 ? (
+        <div className="mb-3 -mt-1 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-400/10 border border-amber-400/30 text-[11px] font-bold text-amber-300 tabular-nums"
+             title={`Brutto ${formatCurrency(row.spentGross ?? row.spent + row.refunded)} ausgegeben, davon ${formatCurrency(row.refunded)} erstattet — Netto ${formatCurrency(row.spent)}.`}>
+          ↻ {formatCurrency(row.refunded)} erstattet
+          <span className="text-on-surface-variant/70 font-normal">
+            · brutto {formatCurrency(row.spentGross ?? row.spent + row.refunded)}
+          </span>
+        </div>
+      ) : null}
 
       {limit > 0 && (
         <div className="space-y-2">
