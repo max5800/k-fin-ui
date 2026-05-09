@@ -5,6 +5,11 @@ const apiBaseUrl =
 
 export const apiClient = axios.create({
   baseURL: apiBaseUrl,
+  // FastAPI consumes list query params as repeated keys
+  // (`?tag_ids=a&tag_ids=b`), not as `tag_ids[]=a`. Axios 1.x defaults to
+  // bracket notation; `indexes: null` switches to bare repeated keys so
+  // arrays in `params` round-trip cleanly to the backend.
+  paramsSerializer: { indexes: null },
 });
 
 apiClient.interceptors.request.use((config) => {

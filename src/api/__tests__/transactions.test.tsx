@@ -98,4 +98,32 @@ describe('downloadTransactionsCsv', () => {
       responseType: 'blob',
     });
   });
+
+  it('forwards tag_ids as an array (paramsSerializer handles repeated keys)', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: new Blob(['x']),
+      headers: {},
+    } as never);
+
+    await downloadTransactionsCsv({ tag_ids: ['tag-a', 'tag-b'] });
+
+    expect(apiClient.get).toHaveBeenCalledWith('/transactions/export', {
+      params: { format: 'csv', tag_ids: ['tag-a', 'tag-b'] },
+      responseType: 'blob',
+    });
+  });
+
+  it('omits tag_ids when the array is empty', async () => {
+    vi.mocked(apiClient.get).mockResolvedValue({
+      data: new Blob(['x']),
+      headers: {},
+    } as never);
+
+    await downloadTransactionsCsv({ tag_ids: [] });
+
+    expect(apiClient.get).toHaveBeenCalledWith('/transactions/export', {
+      params: { format: 'csv' },
+      responseType: 'blob',
+    });
+  });
 });

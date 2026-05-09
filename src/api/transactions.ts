@@ -5,7 +5,7 @@ import type { Transaction, PaginatedResponse } from './types';
 
 export type ExportFilters = Pick<
   TxFilters,
-  'from' | 'to' | 'category_id' | 'tag_id' | 'search'
+  'from' | 'to' | 'category_id' | 'tag_ids' | 'search'
 > & {
   date_from?: string;
   date_to?: string;
@@ -58,7 +58,7 @@ export async function downloadTransactionsCsv(
   filters: ExportFilters = {},
   format: ExportFormat = 'csv',
 ): Promise<void> {
-  const params: Record<string, string> = { format };
+  const params: Record<string, string | string[]> = { format };
   if (filters.date_from || filters.from) {
     params.date_from = (filters.date_from ?? filters.from) as string;
   }
@@ -66,7 +66,11 @@ export async function downloadTransactionsCsv(
     params.date_to = (filters.date_to ?? filters.to) as string;
   }
   if (filters.category_id) params.category_id = filters.category_id;
-  if (filters.tag_id) params.tag_id = filters.tag_id;
+  if (filters.tag_ids && filters.tag_ids.length > 0) {
+    // Axios serializes arrays via the global paramsSerializer
+    // (`indexes: null`) → repeated `?tag_ids=a&tag_ids=b`.
+    params.tag_ids = filters.tag_ids;
+  }
   if (filters.search) params.search = filters.search;
 
   const response = await apiClient.get<Blob>('/transactions/export', {
