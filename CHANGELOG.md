@@ -1,3 +1,10 @@
+# [1.13.0](https://github.com/max5800/k-fin-ui/compare/v1.12.1...v1.13.0) (2026-05-09)
+
+
+### Features
+
+* Welle-1 Stream B — page-size, period-days, cost-card, webhook URL ([#5](https://github.com/max5800/k-fin-ui/issues/5)) ([88c8aff](https://github.com/max5800/k-fin-ui/commit/88c8afffa30603c2d6a485ccf4a723284fe2f887))
+
 ## [1.12.1](https://github.com/max5800/k-fin-ui/compare/v1.12.0...v1.12.1) (2026-05-09)
 
 
