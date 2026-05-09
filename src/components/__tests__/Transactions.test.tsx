@@ -13,6 +13,7 @@ vi.mock('../../api/transactions', () => ({
 }));
 vi.mock('../../api/categories', () => ({
   useCategories: vi.fn(),
+  useTags: vi.fn(),
 }));
 
 import {
@@ -20,7 +21,7 @@ import {
   useUpdateTransaction,
   downloadTransactionsCsv,
 } from '../../api/transactions';
-import { useCategories } from '../../api/categories';
+import { useCategories, useTags } from '../../api/categories';
 import Transactions from '../Transactions';
 
 function renderTransactions(initialEntries: string[] = ['/transactions']) {
@@ -67,6 +68,9 @@ describe('Transactions — CSV-Export-Button', () => {
     vi.mocked(useCategories).mockReturnValue({
       data: [{ id: 'groceries', name: 'Lebensmittel', type: 'variabel' }],
     } as unknown as ReturnType<typeof useCategories>);
+    vi.mocked(useTags).mockReturnValue({
+      data: [],
+    } as unknown as ReturnType<typeof useTags>);
     vi.mocked(downloadTransactionsCsv).mockResolvedValue(undefined);
   });
 

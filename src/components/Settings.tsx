@@ -9,6 +9,7 @@ import { useSettings, useUpdateSettings } from '../api/settings';
 import { useChangePassword } from '../api/auth';
 import BackfillSection from './BackfillSection';
 import SyncRunsHistory from './SyncRunsHistory';
+import TagsSection from './TagsSection';
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -174,6 +175,8 @@ export default function Settings() {
         <BackfillSection />
 
         <SyncRunsHistory />
+
+        <TagsSection />
 
         <section className="bg-surface-container-low rounded-2xl border border-white/5 p-6">
           <div className="flex items-center gap-3 mb-6">

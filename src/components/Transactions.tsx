@@ -4,20 +4,21 @@ import {
   ChevronLeft,
   ChevronRight,
   Download,
+  Hash,
   Receipt,
   RotateCcw,
   Search,
   X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useState } from 'react';
+import { useMemo, useRef, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   downloadTransactionsCsv,
   useTransactions,
   useUpdateTransaction,
 } from '../api/transactions';
-import { useCategories } from '../api/categories';
+import { useCategories, useTags } from '../api/categories';
 import { formatCurrency, formatDate } from '../lib/format';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
@@ -54,6 +55,19 @@ export default function Transactions() {
   const q = searchParams.get('q') || '';
   const isRefundFilter = parseFlag(searchParams.get('is_refund'));
   const internalTransferFilter = parseFlag(searchParams.get('internal_transfer'));
+  // Multi-Tag-Filter: ?tag_ids=a,b,c — kommt als CSV in der URL, wird hier
+  // in ein Set für O(1)-Lookups verwandelt. Bewusst client-side, weil
+  // GET /transactions noch keinen tag-Query-Param unterstützt
+  // (siehe k-fin/src/api/routers/transactions.py::list_transactions).
+  const tagIdsParam = searchParams.get('tag_ids') || '';
+  const selectedTagIds = useMemo(
+    () => tagIdsParam.split(',').map((s) => s.trim()).filter(Boolean),
+    [tagIdsParam],
+  );
+  const selectedTagIdSet = useMemo(
+    () => new Set(selectedTagIds),
+    [selectedTagIds],
+  );
   const offset = (page - 1) * PAGE_SIZE;
 
   const { data: txData, isPending: isTxsPending } = useTransactions({
@@ -65,7 +79,20 @@ export default function Transactions() {
     internal_transfer: internalTransferFilter,
   });
   const { data: categories } = useCategories();
+  const { data: tags } = useTags();
   const { mutate: updateTx, isPending: isUpdating } = useUpdateTransaction();
+
+  // Client-side Tag-Filter: erst nach dem Fetch anwenden, da Backend
+  // (noch) nicht filtert. Folge: kann pro Seite weniger Treffer als
+  // PAGE_SIZE liefern. Wenn Tag-Filter aktiv ist, surfacen wir das im
+  // Footer ("X von Y auf dieser Seite gefiltert").
+  const visibleItems = useMemo(() => {
+    if (!txData?.items) return [];
+    if (selectedTagIdSet.size === 0) return txData.items;
+    return txData.items.filter((tx) =>
+      tx.tags?.some((t) => selectedTagIdSet.has(t.id)),
+    );
+  }, [txData, selectedTagIdSet]);
 
   const {
     register,
@@ -137,6 +164,25 @@ export default function Transactions() {
 
   const total = txData?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
+
+  const setTagIds = (ids: string[]) => {
+    setSearchParams((prev) => {
+      if (ids.length === 0) {
+        prev.delete('tag_ids');
+      } else {
+        prev.set('tag_ids', ids.join(','));
+      }
+      prev.set('page', '1');
+      return prev;
+    });
+  };
+  const toggleTag = (id: string) => {
+    if (selectedTagIdSet.has(id)) {
+      setTagIds(selectedTagIds.filter((x) => x !== id));
+    } else {
+      setTagIds([...selectedTagIds, id]);
+    }
+  };
 
   return (
     <div className="pt-24 px-8 pb-12 flex flex-col h-screen overflow-hidden">
@@ -214,6 +260,18 @@ export default function Transactions() {
           </div>
         </div>
 
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            Tags
+          </label>
+          <TagFilter
+            tags={tags ?? []}
+            selectedIds={selectedTagIds}
+            onToggle={toggleTag}
+            onClear={() => setTagIds([])}
+          />
+        </div>
+
         <div className="md:ml-auto flex flex-col gap-1.5">
           <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant invisible">
             Export
@@ -267,14 +325,16 @@ export default function Transactions() {
                       </td>
                     </tr>
                   ))
-                ) : txData?.items.length === 0 ? (
+                ) : visibleItems.length === 0 ? (
                   <tr>
                     <td colSpan={6} className="text-center py-16 text-on-surface-variant text-sm">
-                      Keine Transaktionen gefunden
+                      {selectedTagIds.length > 0 && (txData?.items.length ?? 0) > 0
+                        ? 'Keine Transaktionen mit den gewählten Tags auf dieser Seite'
+                        : 'Keine Transaktionen gefunden'}
                     </td>
                   </tr>
                 ) : (
-                  txData?.items.map((tx) => (
+                  visibleItems.map((tx) => (
                     <tr
                       key={tx.id}
                       onClick={() => handleEdit(tx)}
@@ -358,7 +418,9 @@ export default function Transactions() {
           <div className="p-4 bg-surface-container/30 border-t border-white/5 flex items-center justify-between">
             <span className="text-xs text-on-surface-variant">
               {total > 0
-                ? `${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} von ${total}`
+                ? selectedTagIds.length > 0
+                  ? `${visibleItems.length} mit Tag-Filter · ${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} von ${total}`
+                  : `${offset + 1}–${Math.min(offset + PAGE_SIZE, total)} von ${total}`
                 : 'Keine Ergebnisse'}
             </span>
             <div className="flex gap-2">
@@ -522,6 +584,140 @@ export default function Transactions() {
           )}
         </AnimatePresence>
       </div>
+    </div>
+  );
+}
+
+type TagOption = { id: string; name: string };
+
+function TagFilter({
+  tags,
+  selectedIds,
+  onToggle,
+  onClear,
+}: {
+  tags: TagOption[];
+  selectedIds: string[];
+  onToggle: (id: string) => void;
+  onClear: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const wrapperRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (
+        wrapperRef.current &&
+        !wrapperRef.current.contains(e.target as Node)
+      ) {
+        setOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', onDown);
+    return () => document.removeEventListener('mousedown', onDown);
+  }, [open]);
+
+  const filteredTags = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return tags;
+    return tags.filter((t) => t.name.toLowerCase().includes(q));
+  }, [tags, query]);
+
+  const selectedSet = new Set(selectedIds);
+  const summary =
+    selectedIds.length === 0
+      ? 'Alle Tags'
+      : selectedIds.length === 1
+        ? `#${tags.find((t) => t.id === selectedIds[0])?.name ?? '?'}`
+        : `${selectedIds.length} Tags`;
+
+  return (
+    <div ref={wrapperRef} className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`bg-surface-container-low px-4 pr-10 py-2.5 rounded-lg text-sm font-medium text-on-surface border transition-all min-w-[200px] flex items-center gap-2 ${
+          selectedIds.length > 0
+            ? 'border-primary/40'
+            : 'border-transparent hover:border-primary/30'
+        }`}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+      >
+        <Hash className="w-4 h-4 text-on-surface-variant" />
+        <span className="flex-1 text-left truncate">{summary}</span>
+        <ChevronDown
+          className={`w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50 transition-transform ${
+            open ? 'rotate-180' : ''
+          }`}
+        />
+      </button>
+
+      {open && (
+        <div className="absolute left-0 top-full mt-1 w-72 bg-surface-container border border-white/10 rounded-lg shadow-2xl z-30 max-h-80 overflow-hidden flex flex-col">
+          <div className="p-2 border-b border-white/5">
+            <input
+              type="text"
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Suchen…"
+              className="w-full bg-surface-container-lowest px-3 py-2 rounded-md text-sm text-on-surface outline-none border border-transparent focus:border-primary/50"
+              aria-label="Tags filtern"
+            />
+          </div>
+
+          <ul className="flex-1 overflow-y-auto py-1" role="listbox">
+            {tags.length === 0 ? (
+              <li className="px-3 py-4 text-xs text-on-surface-variant text-center">
+                Keine Tags vorhanden — anlegen unter Einstellungen.
+              </li>
+            ) : filteredTags.length === 0 ? (
+              <li className="px-3 py-4 text-xs text-on-surface-variant text-center">
+                Keine Treffer
+              </li>
+            ) : (
+              filteredTags.map((tag) => {
+                const checked = selectedSet.has(tag.id);
+                return (
+                  <li key={tag.id} role="option" aria-selected={checked}>
+                    <label className="flex items-center gap-2 px-3 py-2 hover:bg-surface-container-high cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => onToggle(tag.id)}
+                        className="accent-primary"
+                      />
+                      <span className="text-secondary">#</span>
+                      <span className="text-sm text-on-surface flex-1 truncate">
+                        {tag.name}
+                      </span>
+                    </label>
+                  </li>
+                );
+              })
+            )}
+          </ul>
+
+          {selectedIds.length > 0 && (
+            <div className="p-2 border-t border-white/5 flex justify-between items-center">
+              <span className="text-[11px] text-on-surface-variant tabular-nums">
+                {selectedIds.length} ausgewählt
+              </span>
+              <button
+                type="button"
+                onClick={onClear}
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-on-surface-variant hover:text-on-surface"
+              >
+                <X className="w-3 h-3" />
+                Zurücksetzen
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
