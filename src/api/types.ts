@@ -102,6 +102,13 @@ export type Run = {
 
 export type AppSettings = {
   auto_apply_confidence: number;
+  // Transactions table page size — backend clamps to [10, 200], default 25.
+  // Live since k-fin v1.34.1.
+  page_size: number;
+  // Discord webhook for run notifications. Optional; backend support lands
+  // in Wave 1 Stream D — until then, PUT /settings will 422 on this key
+  // and the UI degrades to read-only "demnächst" mode (see Settings.tsx).
+  webhook_url?: string | null;
 };
 
 export type PendingTransactionPreview = {

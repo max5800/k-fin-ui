@@ -1,4 +1,4 @@
-import { Cloud, KeyRound, Layers, LogOut, RefreshCw, Sliders, Smartphone, User, X } from 'lucide-react';
+import { Cloud, KeyRound, Layers, List, LogOut, RefreshCw, Sliders, Smartphone, User, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -11,6 +11,10 @@ import BackfillSection from './BackfillSection';
 import RulesSection from './RulesSection';
 import SyncRunsHistory from './SyncRunsHistory';
 import TagsSection from './TagsSection';
+
+// Mirrors the backend's PAGE_SIZE_MIN/MAX clamp in
+// src/api/routers/settings.py (k-fin) — change there first if you tweak.
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200] as const;
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -236,6 +240,50 @@ export default function Settings() {
               >
                 {updateSettings.isPending ? 'Speichere…' : 'Speichern'}
               </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-surface-container-low rounded-2xl border border-white/5 p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <List className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-headline font-bold text-on-surface">Anzeige</h3>
+              <p className="text-xs text-on-surface-variant">
+                Tabellengröße und Seitennavigation. Greift sofort — kein
+                Re-Login nötig.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center justify-between gap-4">
+            <label
+              htmlFor="page-size-select"
+              className="text-sm text-on-surface-variant"
+            >
+              Transaktionen pro Seite
+            </label>
+            <div className="relative">
+              <select
+                id="page-size-select"
+                value={settingsQuery.data?.page_size ?? 25}
+                onChange={(e) =>
+                  updateSettings.mutate({ page_size: Number(e.target.value) })
+                }
+                disabled={settingsQuery.isPending || updateSettings.isPending}
+                className="bg-surface-container-lowest pl-4 pr-10 py-2.5 rounded-lg text-sm font-bold text-on-surface border border-transparent hover:border-primary/30 cursor-pointer transition-all appearance-none outline-none tabular-nums disabled:opacity-50"
+              >
+                {PAGE_SIZE_OPTIONS.map((n) => (
+                  <option key={n} value={n}>
+                    {n}
+                  </option>
+                ))}
+              </select>
+              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
+                ▾
+              </span>
             </div>
           </div>
         </section>
