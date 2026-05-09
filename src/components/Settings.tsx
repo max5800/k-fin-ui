@@ -1,4 +1,4 @@
-import { Cloud, KeyRound, Layers, List, LogOut, RefreshCw, Sliders, Smartphone, User, X } from 'lucide-react';
+import { Bell, Cloud, KeyRound, Layers, List, LogOut, RefreshCw, Sliders, Smartphone, User, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -16,6 +16,17 @@ import TagsSection from './TagsSection';
 // src/api/routers/settings.py (k-fin) — change there first if you tweak.
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 200] as const;
 
+// Discord accepts both hostnames as valid webhook bases.
+const DISCORD_WEBHOOK_PREFIXES = [
+  'https://discord.com/api/webhooks/',
+  'https://discordapp.com/api/webhooks/',
+];
+
+function isValidDiscordWebhook(url: string): boolean {
+  if (url === '') return true;
+  return DISCORD_WEBHOOK_PREFIXES.some((p) => url.startsWith(p));
+}
+
 export default function Settings() {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
@@ -27,6 +38,14 @@ export default function Settings() {
   const changePassword = useChangePassword();
   const [thresholdDraft, setThresholdDraft] = useState<number>(0.6);
 
+  // Discord webhook draft state. The field is optional and the backend
+  // currently (Wave-1) doesn't accept it — see handleSaveWebhook for the
+  // graceful-degradation path when /settings PUT comes back 422.
+  const [webhookDraft, setWebhookDraft] = useState<string>('');
+  const [webhookError, setWebhookError] = useState<string | null>(null);
+  const [webhookSaved, setWebhookSaved] = useState(false);
+  const [webhookBackendMissing, setWebhookBackendMissing] = useState(false);
+
   // Change-password form state
   const [currentPw, setCurrentPw] = useState('');
   const [newPw, setNewPw] = useState('');
@@ -36,6 +55,7 @@ export default function Settings() {
   useEffect(() => {
     if (settingsQuery.data) {
       setThresholdDraft(settingsQuery.data.auto_apply_confidence);
+      setWebhookDraft(settingsQuery.data.webhook_url ?? '');
     }
   }, [settingsQuery.data]);
 
@@ -81,6 +101,37 @@ export default function Settings() {
     localStorage.removeItem('kfin_display_name');
     queryClient.clear();
     navigate('/login');
+  };
+
+  const handleSaveWebhook = async () => {
+    setWebhookError(null);
+    setWebhookSaved(false);
+    if (!isValidDiscordWebhook(webhookDraft)) {
+      setWebhookError(
+        'URL muss mit https://discord.com/api/webhooks/ beginnen.',
+      );
+      return;
+    }
+    try {
+      // Empty string clears the value. Send `null` so the backend can
+      // explicitly reset the column rather than save a literal "".
+      await updateSettings.mutateAsync({
+        webhook_url: webhookDraft === '' ? null : webhookDraft,
+      });
+      setWebhookSaved(true);
+      setWebhookBackendMissing(false);
+    } catch (err) {
+      // Stream-D-not-yet-deployed path: backend rejects the unknown field
+      // with 422. Surface a friendly notice instead of a stack-trace and
+      // leave the rest of the settings page fully usable.
+      if (isAxiosError(err) && err.response?.status === 422) {
+        setWebhookBackendMissing(true);
+        return;
+      }
+      setWebhookError(
+        extractError(err, 'Webhook konnte nicht gespeichert werden'),
+      );
+    }
   };
 
   const handleChangePassword = async (e: FormEvent) => {
@@ -240,6 +291,93 @@ export default function Settings() {
               >
                 {updateSettings.isPending ? 'Speichere…' : 'Speichern'}
               </button>
+            </div>
+          </div>
+        </section>
+
+        <section className="bg-surface-container-low rounded-2xl border border-white/5 p-6">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+              <Bell className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-headline font-bold text-on-surface">
+                Benachrichtigungen
+              </h3>
+              <p className="text-xs text-on-surface-variant">
+                Optional: Discord-Webhook-URL für Run-Benachrichtigungen.
+                Nichts wird ohne Webhook irgendwohin gepusht.
+              </p>
+            </div>
+          </div>
+
+          <div className="space-y-3">
+            <label
+              htmlFor="webhook-url"
+              className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+            >
+              Discord Webhook URL
+            </label>
+            <input
+              id="webhook-url"
+              type="url"
+              autoComplete="off"
+              spellCheck={false}
+              placeholder="https://discord.com/api/webhooks/…"
+              value={webhookDraft}
+              onChange={(e) => {
+                setWebhookDraft(e.target.value);
+                setWebhookError(null);
+                setWebhookSaved(false);
+              }}
+              disabled={settingsQuery.isPending || updateSettings.isPending}
+              className="w-full bg-surface-container-lowest px-4 py-3 rounded-xl text-sm text-on-surface outline-none border border-transparent focus:border-primary/50 transition-all font-mono disabled:opacity-50"
+            />
+            {webhookError && (
+              <p className="text-xs text-error font-bold" role="alert">
+                {webhookError}
+              </p>
+            )}
+            {webhookBackendMissing && (
+              <p
+                className="text-xs text-on-surface-variant italic"
+                role="status"
+              >
+                Backend-Unterstützung folgt — der Server hat das Feld noch
+                nicht akzeptiert (HTTP 422). Wert wurde nicht gespeichert.
+              </p>
+            )}
+            {webhookSaved && !webhookError && (
+              <p className="text-xs text-primary font-bold" role="status">
+                Webhook gespeichert.
+              </p>
+            )}
+            <div className="flex items-center justify-between gap-3 pt-1">
+              <p className="text-[11px] text-on-surface-variant">
+                Leer lassen zum Deaktivieren. Test-Send folgt mit Stream D.
+              </p>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  disabled
+                  title="Verfügbar sobald das Backend den Webhook akzeptiert (Wave 1 Stream D)."
+                  className="bg-surface-container-high text-on-surface-variant px-3 py-2 rounded-lg text-xs font-bold opacity-50 cursor-not-allowed"
+                >
+                  Test-Send (demnächst)
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSaveWebhook}
+                  disabled={
+                    updateSettings.isPending ||
+                    !settingsQuery.data ||
+                    webhookDraft === (settingsQuery.data?.webhook_url ?? '')
+                  }
+                  className="bg-primary text-on-primary px-4 py-2 rounded-lg text-xs font-bold hover:brightness-110 transition-all disabled:opacity-50"
+                >
+                  {updateSettings.isPending ? 'Speichere…' : 'Speichern'}
+                </button>
+              </div>
             </div>
           </div>
         </section>
