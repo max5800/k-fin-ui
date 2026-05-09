@@ -1,3 +1,10 @@
+# [1.14.0](https://github.com/max5800/k-fin-ui/compare/v1.13.0...v1.14.0) (2026-05-09)
+
+
+### Features
+
+* **portfolio:** position drilldown with ticker mapping + price backfill + history chart ([#6](https://github.com/max5800/k-fin-ui/issues/6)) ([0ec86d7](https://github.com/max5800/k-fin-ui/commit/0ec86d7f5376184807435fe1e2d7c1bfd1a41c44))
+
 # [1.13.0](https://github.com/max5800/k-fin-ui/compare/v1.12.1...v1.13.0) (2026-05-09)
 
 
