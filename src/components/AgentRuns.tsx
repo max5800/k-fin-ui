@@ -150,6 +150,12 @@ export default function AgentRuns() {
   } = useRerunRun();
 
   const [pending, setPending] = useState<PendingTrigger | null>(null);
+  // Time-window override for the run-trigger. `null` = "Standard" — backend
+  // applies the agent's built-in window and we send no `period_days` param.
+  // Custom number values are clamped to [1, 3650] (backend hard cap).
+  const [periodDaysOverride, setPeriodDaysOverride] = useState<number | null>(
+    null,
+  );
   const [cancelTargetId, setCancelTargetId] = useState<string | null>(null);
   const [expandedRuns, setExpandedRuns] = useState<Set<string>>(new Set());
   const toggleExpand = (id: string) => {
@@ -176,10 +182,17 @@ export default function AgentRuns() {
 
   const confirmRun = () => {
     if (!pending) return;
+    const period_days = periodDaysOverride ?? undefined;
     if (pending.kind === 'full') {
-      triggerFull(undefined, { onSettled: () => setPending(null) });
+      triggerFull(
+        { period_days },
+        { onSettled: () => setPending(null) },
+      );
     } else {
-      triggerRun(pending.agent.id, { onSettled: () => setPending(null) });
+      triggerRun(
+        { agent_name: pending.agent.id, period_days },
+        { onSettled: () => setPending(null) },
+      );
     }
   };
 
@@ -240,6 +253,12 @@ export default function AgentRuns() {
         )}
       </div>
 
+      <PeriodPicker
+        value={periodDaysOverride}
+        onChange={setPeriodDaysOverride}
+        disabled={isAnyTriggering || hasActiveRun}
+      />
+
       <div className="grid grid-cols-12 gap-6 mb-12">
         <div className="col-span-12 lg:col-span-4">
           <div className="w-full h-full flex flex-col justify-between p-8 bg-surface-container-highest rounded-2xl border-2 border-secondary relative overflow-hidden group transition-all hover:shadow-[0_0_40px_rgba(244,189,95,0.1)]">
@@ -275,7 +294,8 @@ export default function AgentRuns() {
         <div className="col-span-12 lg:col-span-8 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {AGENTS.map((agent) => {
             const Icon = agent.icon;
-            const isThisTriggering = isTriggering && triggeringAgent === agent.id;
+            const isThisTriggering =
+              isTriggering && triggeringAgent?.agent_name === agent.id;
             return (
               <div
                 key={agent.id}
@@ -854,5 +874,139 @@ function RunRow({
         </tr>
       )}
     </>
+  );
+}
+
+// Optional time-window override for the run-trigger. Presets cover the
+// common cases (week / month / quarter / year); "Custom" exposes a raw
+// number input clamped to the backend's [1, 3650] range. "Standard" sends
+// no `period_days` param so the agent's built-in window applies.
+type PeriodPreset = 'standard' | 7 | 30 | 90 | 365 | 'custom';
+
+const PERIOD_PRESET_LABEL: Record<Exclude<PeriodPreset, 'custom'>, string> = {
+  standard: 'Standard',
+  7: '7 Tage',
+  30: '30 Tage',
+  90: '90 Tage',
+  365: '365 Tage',
+};
+
+const PERIOD_PRESETS: Exclude<PeriodPreset, 'custom'>[] = [
+  'standard',
+  7,
+  30,
+  90,
+  365,
+];
+
+function PeriodPicker({
+  value,
+  onChange,
+  disabled,
+}: {
+  value: number | null;
+  onChange: (next: number | null) => void;
+  disabled: boolean;
+}) {
+  // The picker keeps a local "mode" so "Custom" can be selected with an
+  // empty input field — once the user types a number we lift it. While
+  // mode === 'custom' and the input is blank we still send no override.
+  const initialMode: PeriodPreset =
+    value === null
+      ? 'standard'
+      : value === 7 || value === 30 || value === 90 || value === 365
+        ? value
+        : 'custom';
+  const [mode, setMode] = useState<PeriodPreset>(initialMode);
+  const [customDraft, setCustomDraft] = useState<string>(
+    initialMode === 'custom' && value !== null ? String(value) : '',
+  );
+
+  const handleModeChange = (next: PeriodPreset) => {
+    setMode(next);
+    if (next === 'standard') {
+      onChange(null);
+    } else if (next === 'custom') {
+      const parsed = Number(customDraft);
+      onChange(
+        customDraft !== '' && Number.isFinite(parsed) && parsed >= 1
+          ? Math.min(3650, Math.floor(parsed))
+          : null,
+      );
+    } else {
+      onChange(next);
+    }
+  };
+
+  const handleCustomChange = (raw: string) => {
+    setCustomDraft(raw);
+    if (raw === '') {
+      onChange(null);
+      return;
+    }
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed < 1) {
+      onChange(null);
+      return;
+    }
+    onChange(Math.min(3650, Math.floor(parsed)));
+  };
+
+  return (
+    <div className="mb-6 flex flex-wrap items-center gap-3 bg-surface-container-low/60 rounded-xl border border-white/5 px-4 py-3">
+      <span className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+        Zeitraum
+      </span>
+      <div className="flex flex-wrap gap-1.5">
+        {PERIOD_PRESETS.map((preset) => {
+          const active = mode === preset;
+          return (
+            <button
+              key={String(preset)}
+              type="button"
+              onClick={() => handleModeChange(preset)}
+              disabled={disabled}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+                active
+                  ? 'bg-primary text-on-primary'
+                  : 'bg-surface-container-high text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              {PERIOD_PRESET_LABEL[preset]}
+            </button>
+          );
+        })}
+        <button
+          type="button"
+          onClick={() => handleModeChange('custom')}
+          disabled={disabled}
+          className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all disabled:opacity-50 disabled:cursor-not-allowed ${
+            mode === 'custom'
+              ? 'bg-primary text-on-primary'
+              : 'bg-surface-container-high text-on-surface-variant hover:text-on-surface'
+          }`}
+        >
+          Custom
+        </button>
+      </div>
+      {mode === 'custom' && (
+        <input
+          type="number"
+          min={1}
+          max={3650}
+          step={1}
+          inputMode="numeric"
+          placeholder="Tage"
+          value={customDraft}
+          onChange={(e) => handleCustomChange(e.target.value)}
+          disabled={disabled}
+          aria-label="Zeitraum in Tagen"
+          className="w-24 bg-surface-container-lowest px-3 py-1.5 rounded-md text-xs font-bold text-on-surface tabular-nums outline-none border border-transparent focus:border-primary/50 disabled:opacity-50"
+        />
+      )}
+      <span className="text-[10px] text-on-surface-variant ml-auto">
+        Wirkt nur auf Wochen-, Monats- und Anomalie-Agent.
+      </span>
+    </div>
   );
 }
