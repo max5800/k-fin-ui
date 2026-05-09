@@ -33,6 +33,9 @@ export const qk = {
   tags: {
     all: ['tags'] as const,
   },
+  rules: {
+    all: ['rules'] as const,
+  },
   runs: { 
     all: ['runs'] as const, 
     list: (f: RunFilters) => ['runs', 'list', f] as const,

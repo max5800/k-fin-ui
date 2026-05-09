@@ -17,6 +17,26 @@ export type Tag = {
   name: string;
 };
 
+// Categorization rule: a regex that auto-assigns a category to matching
+// transactions during the normalization pipeline. Mirrors `Rule` in
+// src/core/db/models.py — see also `_apply_rules` in src/normalization/pipeline.py
+// (case-insensitive match against sender + recipient + description, highest
+// priority wins).
+export type CategoryRule = {
+  id: number;
+  regex_pattern: string;
+  target_category_id: string;
+  priority: number;
+};
+
+export type CategoryRuleCreate = {
+  regex_pattern: string;
+  target_category_id: string;
+  priority: number;
+};
+
+export type CategoryRuleUpdate = Partial<CategoryRuleCreate>;
+
 export type Transaction = {
   id: string;
   comdirect_id: string | null;

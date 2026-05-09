@@ -1,7 +1,15 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { isAxiosError } from 'axios';
 import { apiClient } from './client';
 import { qk } from '../lib/queryKeys';
-import type { Category, Budget, Tag } from './types';
+import type {
+  Budget,
+  Category,
+  CategoryRule,
+  CategoryRuleCreate,
+  CategoryRuleUpdate,
+  Tag,
+} from './types';
 
 // Categories
 export function useCategories() {
@@ -95,6 +103,74 @@ export function useDeleteTag() {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.tags.all });
+    },
+  });
+}
+
+// ── Categorization rules ─────────────────────────────────────────────
+//
+// Regex-driven auto-categorization rules. The CRUD endpoints
+// (/categories/rules) are scheduled but not yet shipped on the backend
+// — see the README of this PR. Until they land, useRules degrades to an
+// empty list on 404 so the UI stays usable, and the mutations surface
+// the backend error verbatim through the standard React-Query path
+// (RulesSection renders it as a toast and reverts the optimistic state).
+function isMissingRulesEndpoint(err: unknown): boolean {
+  return isAxiosError(err) && err.response?.status === 404;
+}
+
+export function useRules() {
+  return useQuery({
+    queryKey: qk.rules.all,
+    queryFn: async () => {
+      try {
+        const { data } = await apiClient.get<CategoryRule[]>('/categories/rules');
+        return data;
+      } catch (err) {
+        if (isMissingRulesEndpoint(err)) return [] as CategoryRule[];
+        throw err;
+      }
+    },
+  });
+}
+
+export function useCreateRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (rule: CategoryRuleCreate) => {
+      const { data } = await apiClient.post<CategoryRule>('/categories/rules', rule);
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.rules.all });
+    },
+  });
+}
+
+export function useUpdateRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async ({ id, ...patch }: { id: number } & CategoryRuleUpdate) => {
+      const { data } = await apiClient.patch<CategoryRule>(
+        `/categories/rules/${id}`,
+        patch,
+      );
+      return data;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.rules.all });
+    },
+  });
+}
+
+export function useDeleteRule() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (id: number) => {
+      await apiClient.delete(`/categories/rules/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.rules.all });
     },
   });
 }
