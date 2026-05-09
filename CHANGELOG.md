@@ -1,3 +1,10 @@
+# [1.11.0](https://github.com/max5800/k-fin-ui/compare/v1.10.0...v1.11.0) (2026-05-09)
+
+
+### Features
+
+* **ui:** tags-management — settings sub-section + tx multi-select filter ([#2](https://github.com/max5800/k-fin-ui/issues/2)) ([f7f1259](https://github.com/max5800/k-fin-ui/commit/f7f125979f6de55b334d00dcd87b9d332cabc861))
+
 # [1.10.0](https://github.com/max5800/k-fin-ui/compare/v1.9.0...v1.10.0) (2026-05-09)
 
 
