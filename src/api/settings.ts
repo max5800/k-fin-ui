@@ -25,3 +25,20 @@ export function useUpdateSettings() {
     },
   });
 }
+
+export interface WebhookTestResult {
+  success: boolean;
+  status_code: number | null;
+  error: string | null;
+}
+
+export function useTestWebhook() {
+  return useMutation({
+    mutationFn: async () => {
+      const { data } = await apiClient.post<WebhookTestResult>(
+        '/settings/webhook/test',
+      );
+      return data;
+    },
+  });
+}
