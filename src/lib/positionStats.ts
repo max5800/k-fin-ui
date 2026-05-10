@@ -39,8 +39,23 @@ export type CostBasisStats = {
   avgCostPerShare: number;
   /** Σ(BUY amount) − Σ(SELL share-cost). Decreases as shares are sold. */
   remainingCostBasis: number;
-  /** Σ(SELL proceeds) − Σ(SELL share-cost) + Σ(DIVIDEND amount). */
+  /**
+   * salesPnl + dividendsPnl. Kept as the canonical "realised" figure
+   * so callers that don't care about the split keep working.
+   */
   realizedPnl: number;
+  /**
+   * Σ(SELL proceeds) − Σ(SELL share-cost). Maps to Anlage KAP "Gewinn
+   * aus Veräußerung" (line 7 / 9, depending on instrument type) once
+   * the user reconciles against the FIFO figure on the
+   * Jahressteuerbescheinigung.
+   */
+  salesPnl: number;
+  /**
+   * Σ(DIVIDEND amount). Maps to Anlage KAP "Kapitalerträge" (line 7)
+   * — pre-tax / brutto in the Comdirect feed.
+   */
+  dividendsPnl: number;
   /** current_value − remainingCostBasis (only when shares are held). */
   unrealizedPnl: number;
   /** realizedPnl + unrealizedPnl. */
@@ -48,14 +63,18 @@ export type CostBasisStats = {
   /** Net BUY − SELL quantity walked through the chronology. */
   currentQuantity: number;
   /**
-   * True when a SELL appeared before any BUY — the underlying ledger
-   * is incomplete (e.g. transfer-in not represented as BUY) and
-   * numbers should be shown with a warning.
+   * True when the dataset is missing earlier transactions — either a
+   * SELL appeared before any BUY, or a SELL exceeded the running
+   * held-quantity (see `oversold`). Both indicate the cost basis is
+   * reconstructed from an incomplete ledger and the numbers should
+   * be shown with a warning.
    */
   ledgerIncomplete: boolean;
   /**
-   * True when the running quantity drops below zero on a SELL — same
-   * ledger-incomplete signal, distinct so we can phrase the warning.
+   * True when the running quantity drops below zero on a SELL — set
+   * alongside `ledgerIncomplete` and kept distinct so the UI can
+   * phrase the warning specifically (more shares sold than ever
+   * bought in the visible window).
    */
   oversold: boolean;
 };
@@ -76,7 +95,8 @@ export function computeCostBasis(
 
   let qty = 0;
   let remainingCost = 0;
-  let realized = 0;
+  let salesPnl = 0;
+  let dividendsPnl = 0;
   let ledgerIncomplete = false;
   let oversold = false;
 
@@ -92,28 +112,44 @@ export function computeCostBasis(
         // the depot was loaded mid-stream. Skip cost reduction so
         // realized P&L isn't bogus, but flag the inconsistency.
         ledgerIncomplete = true;
-        realized += txAmount;
+        salesPnl += txAmount;
         continue;
       }
       const sellQty = Math.min(txQty, qty);
-      if (sellQty < txQty) oversold = true;
       const avgPerShare = remainingCost / qty;
       const soldCost = avgPerShare * sellQty;
-      realized += txAmount - soldCost;
+      if (sellQty < txQty) {
+        // Oversold path: the depot was loaded mid-stream and earlier
+        // BUYs are missing, so we only own `sellQty` of the `txQty`
+        // shares the user is reporting as sold. Pro-rate proceeds to
+        // the held share — otherwise we'd credit the *full* sale
+        // amount against the cost of just the held slice and inflate
+        // realized P&L. Also flag `ledgerIncomplete` so the warning
+        // in the UI keeps surfacing the uncertainty.
+        oversold = true;
+        ledgerIncomplete = true;
+        const proceedsForHeldShare = (txAmount * sellQty) / txQty;
+        salesPnl += proceedsForHeldShare - soldCost;
+      } else {
+        salesPnl += txAmount - soldCost;
+      }
       remainingCost -= soldCost;
       qty -= sellQty;
     } else if (tx.transaction_type === 'DIVIDEND') {
-      realized += txAmount;
+      dividendsPnl += txAmount;
     }
     // OTHER: deliberately ignored — see method note above.
   }
 
   const avgCostPerShare = qty > 0 ? remainingCost / qty : 0;
   const unrealized = qty > 0 ? currentValue - remainingCost : 0;
+  const realized = salesPnl + dividendsPnl;
   return {
     avgCostPerShare,
     remainingCostBasis: remainingCost,
     realizedPnl: realized,
+    salesPnl,
+    dividendsPnl,
     unrealizedPnl: unrealized,
     totalPnl: realized + unrealized,
     currentQuantity: qty,

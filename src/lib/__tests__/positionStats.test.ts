@@ -26,6 +26,8 @@ describe('computeCostBasis', () => {
       avgCostPerShare: 0,
       remainingCostBasis: 0,
       realizedPnl: 0,
+      salesPnl: 0,
+      dividendsPnl: 0,
       unrealizedPnl: 0,
       totalPnl: 0,
       currentQuantity: 0,
@@ -119,8 +121,49 @@ describe('computeCostBasis', () => {
     expect(stats.currentQuantity).toBe(10);
     expect(stats.remainingCostBasis).toBe(1000);
     expect(stats.realizedPnl).toBe(25);
+    // Split: dividends are tracked separately from sale-side P&L so
+    // the user can map them to Anlage KAP "Kapitalerträge" cleanly.
+    expect(stats.dividendsPnl).toBe(25);
+    expect(stats.salesPnl).toBe(0);
     expect(stats.unrealizedPnl).toBe(100); // 1100 - 1000
     expect(stats.totalPnl).toBe(125);
+  });
+
+  it('splits realised P&L into sales and dividends', () => {
+    // Buy 10 @ 100 (cost 1000), receive 30 EUR dividend, then sell 4
+    // @ 130 (proceeds 520). Sale-cost = 4 × 100 = 400, salesPnl = 120.
+    // Combined realized = 120 + 30 = 150.
+    const txs = [
+      mkTx({
+        transaction_id: 'A',
+        booking_date: '2026-01-01',
+        transaction_type: 'BUY',
+        quantity: 10,
+        price: 100,
+        amount: 1000,
+      }),
+      mkTx({
+        transaction_id: 'B',
+        booking_date: '2026-04-01',
+        transaction_type: 'DIVIDEND',
+        quantity: 10,
+        price: 0,
+        amount: 30,
+      }),
+      mkTx({
+        transaction_id: 'C',
+        booking_date: '2026-06-01',
+        transaction_type: 'SELL',
+        quantity: 4,
+        price: 130,
+        amount: 520,
+      }),
+    ];
+    const stats = computeCostBasis(txs, 720); // 6 × 120 current price
+    expect(stats.salesPnl).toBe(120);
+    expect(stats.dividendsPnl).toBe(30);
+    expect(stats.realizedPnl).toBe(150); // sales + dividends
+    expect(stats.currentQuantity).toBe(6);
   });
 
   it('walks transactions chronologically regardless of input order', () => {
@@ -187,6 +230,54 @@ describe('computeCostBasis', () => {
     ];
     const stats = computeCostBasis(txs, 0);
     expect(stats.oversold).toBe(true);
+    // Oversold path also flips ledgerIncomplete so the UI keeps
+    // surfacing the warning even when no SELL-before-BUY happened.
+    expect(stats.ledgerIncomplete).toBe(true);
+    expect(stats.currentQuantity).toBe(0);
+  });
+
+  it('pro-rates oversold SELL proceeds to the held share (no inflated P&L)', () => {
+    // Bug pin (FC1 from the finance review): depot loaded mid-stream,
+    // earlier BUYs are missing, so the SELL-side `quantity` exceeds
+    // the running held-quantity. Old code capped `sellQty` to the
+    // held quantity but still credited the *full* `amount` proceeds
+    // against the held-slice cost — synthesising a phantom gain.
+    //
+    // Scenario from the brief: BUY 5 @ 50 EUR (total 250), then a
+    // SELL of 10 @ 110 EUR (total 1100). Only 5 of those 10 sold
+    // shares are accounted for in our window.
+    //   avg_per_share        = 250 / 5             = 50
+    //   sold_cost (held)     = 50 × 5              = 250
+    //   buggy realized       = 1100 − 250          = 850   ← inflated
+    //   pro-rated proceeds   = 1100 × 5 / 10       = 550
+    //   correct realized     = 550 − 250           = 300
+    const txs = [
+      mkTx({
+        transaction_id: 'A',
+        booking_date: '2026-01-01',
+        transaction_type: 'BUY',
+        quantity: 5,
+        price: 50,
+        amount: 250,
+      }),
+      mkTx({
+        transaction_id: 'B',
+        booking_date: '2026-02-01',
+        transaction_type: 'SELL',
+        quantity: 10,
+        price: 110,
+        amount: 1100,
+      }),
+    ];
+    const stats = computeCostBasis(txs, 0);
+    // Hard pin: NOT the old buggy 850 figure.
+    expect(stats.realizedPnl).not.toBe(850);
+    // Pro-rated formula: (1100 * 5/10) − (5 * 50) = 550 − 250 = 300.
+    expect(stats.realizedPnl).toBe(300);
+    expect(stats.oversold).toBe(true);
+    // Oversold path keeps `ledgerIncomplete` true so the UI's
+    // "incomplete history" warning stays visible.
+    expect(stats.ledgerIncomplete).toBe(true);
     expect(stats.currentQuantity).toBe(0);
   });
 
