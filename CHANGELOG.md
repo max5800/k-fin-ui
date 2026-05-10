@@ -1,3 +1,11 @@
+# [1.16.0](https://github.com/max5800/k-fin-ui/compare/v1.15.0...v1.16.0) (2026-05-10)
+
+
+### Features
+
+* **portfolio:** drilldown — tx history + cumulative p&l + avg cost basis ([#9](https://github.com/max5800/k-fin-ui/issues/9)) ([95b4f37](https://github.com/max5800/k-fin-ui/commit/95b4f37ee5d1058385700b0273777a147cd07734))
+* **ui:** welle-1.5 — categories create + apply-all + agents page-size ([#8](https://github.com/max5800/k-fin-ui/issues/8)) ([c4f3138](https://github.com/max5800/k-fin-ui/commit/c4f31385429629ee63697604e9679a2cf337e4f8))
+
 # [1.15.0](https://github.com/max5800/k-fin-ui/compare/v1.14.0...v1.15.0) (2026-05-10)
 
 
