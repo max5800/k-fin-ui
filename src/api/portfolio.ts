@@ -4,8 +4,10 @@ import { qk } from '../lib/queryKeys';
 import type {
   AllocationBucket,
   Depot,
+  DepotTransaction,
   Instrument,
   InstrumentPricePoint,
+  PaginatedResponse,
   PerformancePoint,
   PerformanceRange,
   PortfolioSummary,
@@ -142,6 +144,29 @@ export function useBackfillPrices(isin: string) {
           );
         },
       });
+    },
+  });
+}
+
+// GET /depots/{depot_id}/transactions — depot-level BUY/SELL/DIVIDEND
+// history. The backend does **not** currently expose an ISIN filter
+// (see src/api/routers/depots.py::list_depot_transactions), so callers
+// fetch the slice once and filter client-side. ``limit`` defaults to
+// the backend max of 500 — enough to cover the full position history
+// in the personal-finance use case without paging.
+export function useDepotTransactions(
+  depotId: string | null | undefined,
+  limit = 500,
+) {
+  return useQuery({
+    queryKey: qk.portfolio.depotTransactions(depotId ?? '', limit),
+    enabled: Boolean(depotId),
+    queryFn: async () => {
+      const { data } = await apiClient.get<PaginatedResponse<DepotTransaction>>(
+        `/depots/${depotId}/transactions`,
+        { params: { limit, offset: 0 } },
+      );
+      return data;
     },
   });
 }
