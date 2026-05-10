@@ -95,6 +95,10 @@ vi.mock('../../api/portfolio', () => ({
   useInstrumentPrices: () => ({ data: [], isPending: false }),
   usePatchInstrument: () => ({ mutateAsync: vi.fn(), isPending: false }),
   useBackfillPrices: () => ({ mutateAsync: vi.fn(), isPending: false }),
+  useDepotTransactions: () => ({
+    data: { items: [], total: 0, limit: 500, offset: 0 },
+    isPending: false,
+  }),
 }));
 
 function renderPortfolio() {

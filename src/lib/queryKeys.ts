@@ -74,5 +74,11 @@ export const qk = {
     // after PATCH ticker_symbol or POST backfill-prices, so every prices
     // query for that ISIN refetches regardless of date window.
     instrument: (isin: string) => ['portfolio', 'instrument', isin] as const,
+    // Depot-scoped transaction list (BUY/SELL/DIVIDEND/OTHER). Backend
+    // currently has no per-ISIN filter param, so the panel filters
+    // client-side after fetching the depot's recent slice. ``limit`` is
+    // baked into the key so a wider fetch invalidates separately.
+    depotTransactions: (depotId: string, limit: number) =>
+      ['portfolio', 'depot-transactions', depotId, limit] as const,
   },
 } as const;

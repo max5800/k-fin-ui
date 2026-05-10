@@ -4,7 +4,11 @@ import { isAxiosError } from 'axios';
 import {
   AlertTriangle,
   CheckCircle2,
+  ChevronDown,
+  ChevronUp,
   Download,
+  History,
+  PieChart,
   Save,
   TrendingUp,
   X,
@@ -23,11 +27,18 @@ import { de } from 'date-fns/locale';
 
 import {
   useBackfillPrices,
+  useDepotTransactions,
   useInstrumentPrices,
   usePatchInstrument,
 } from '../api/portfolio';
 import { formatCurrency, formatDate } from '../lib/format';
-import type { InstrumentPricePoint, Position } from '../api/types';
+import { computeCostBasis, type CostBasisStats } from '../lib/positionStats';
+import type {
+  DepotTransaction,
+  DepotTransactionType,
+  InstrumentPricePoint,
+  Position,
+} from '../api/types';
 
 /**
  * Drill-down side-panel for a portfolio position.
@@ -105,6 +116,9 @@ function toChartData(points: InstrumentPricePoint[]): ChartPoint[] {
     currency: p.currency,
   }));
 }
+
+// Cost-basis + P&L logic lives in `src/lib/positionStats.ts`. See the
+// doc-block there for method (weighted-average) and conventions.
 
 function PriceTooltip({
   active,
@@ -252,6 +266,27 @@ function PanelInner({
   );
   const chartData = useMemo(() => toChartData(prices ?? []), [prices]);
 
+  // ── Depot transactions (filtered to this ISIN) ─────────────────
+  // Backend exposes the list per-depot only — no ISIN filter param —
+  // so we fetch the depot slice and trim client-side. 500 is the
+  // backend's hard cap and is sufficient for any one ISIN's history
+  // in a personal-finance depot.
+  const { data: depotTxData, isPending: depotTxPending } = useDepotTransactions(
+    position.depot_id,
+    500,
+  );
+  const positionTxs = useMemo<DepotTransaction[]>(() => {
+    const all = depotTxData?.items ?? [];
+    return all.filter((t) => t.isin === instrument.isin);
+  }, [depotTxData, instrument.isin]);
+
+  // Cost basis + realized/unrealized P&L computed entirely from the
+  // filtered list — see the `computeCostBasis` doc-block for method.
+  const stats = useMemo(
+    () => computeCostBasis(positionTxs, position.current_value),
+    [positionTxs, position.current_value],
+  );
+
   // ── Render ─────────────────────────────────────────────────────
   return (
     <>
@@ -336,6 +371,19 @@ function PanelInner({
             error={backfillError}
             result={backfillResult}
             currencyMismatch={currencyMismatch}
+          />
+
+          <PnlCard
+            stats={stats}
+            currency={position.currency}
+            isPending={depotTxPending}
+            txCount={positionTxs.length}
+          />
+
+          <TxHistoryTable
+            txs={positionTxs}
+            currency={position.currency}
+            isPending={depotTxPending}
           />
 
           <PerformanceChart
@@ -593,6 +641,310 @@ function BackfillForm({
         </p>
       )}
     </section>
+  );
+}
+
+type PnlCardProps = {
+  stats: CostBasisStats;
+  currency: string;
+  isPending: boolean;
+  txCount: number;
+};
+
+function PnlCard({ stats, currency, isPending, txCount }: PnlCardProps) {
+  const showWarning = stats.ledgerIncomplete || stats.oversold;
+  return (
+    <section
+      className="bg-surface-container-lowest rounded-2xl p-5 border border-white/5"
+      aria-labelledby="pnl-card-heading"
+    >
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-lg bg-tertiary/10 flex items-center justify-center text-tertiary">
+          <PieChart className="w-4 h-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3
+            id="pnl-card-heading"
+            className="font-headline font-bold text-on-surface text-sm"
+          >
+            Kumulierter P&amp;L
+          </h3>
+          <p className="text-xs text-on-surface-variant">
+            Aus {txCount} Buchung{txCount === 1 ? '' : 'en'} dieser ISIN
+            (gewichteter Durchschnitt).
+          </p>
+        </div>
+        <span
+          className="text-[11px] uppercase tracking-widest text-on-surface-variant font-bold tabular-nums shrink-0"
+          aria-label="Durchschnittliche Kostenbasis"
+          title="Gewichtete durchschnittliche Kostenbasis pro Stück"
+        >
+          {stats.currentQuantity > 0 && !isPending
+            ? `Ø ${formatCurrency(stats.avgCostPerShare, currency)}`
+            : 'Ø —'}
+        </span>
+      </div>
+
+      {isPending ? (
+        <div className="grid grid-cols-3 gap-3">
+          <div className="h-16 bg-white/5 rounded-xl animate-pulse" />
+          <div className="h-16 bg-white/5 rounded-xl animate-pulse" />
+          <div className="h-16 bg-white/5 rounded-xl animate-pulse" />
+        </div>
+      ) : (
+        <div className="grid grid-cols-3 gap-3">
+          <PnlTile
+            label="Realisiert"
+            value={stats.realizedPnl}
+            currency={currency}
+          />
+          <PnlTile
+            label="Unrealisiert"
+            value={stats.unrealizedPnl}
+            currency={currency}
+          />
+          <PnlTile
+            label="Gesamt"
+            value={stats.totalPnl}
+            currency={currency}
+            emphasis
+          />
+        </div>
+      )}
+
+      {showWarning && !isPending && (
+        <div
+          role="status"
+          className="mt-4 flex gap-3 p-3 rounded-xl bg-amber-400/10 border border-amber-400/30"
+        >
+          <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
+          <div className="text-xs">
+            <p className="font-bold text-amber-300 mb-1">Lückenhafte Historie</p>
+            <p className="text-on-surface-variant">
+              {stats.oversold
+                ? 'Es wurden mehr Stücke verkauft, als BUY-Buchungen vorliegen — die ältesten Käufe fehlen vermutlich im Datensatz. Realisierter P&L ist näherungsweise.'
+                : 'Verkäufe vor erstem BUY — Comdirect-Historie reicht nicht weit genug zurück. Kostenbasis kann unvollständig sein.'}
+            </p>
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}
+
+function PnlTile({
+  label,
+  value,
+  currency,
+  emphasis = false,
+}: {
+  label: string;
+  value: number;
+  currency: string;
+  emphasis?: boolean;
+}) {
+  // Sign-driven color so the user reads the row at a glance. Tile is
+  // neutral when value is exactly 0 (matches the row hover state in
+  // the parent table for consistency).
+  const tone =
+    value > 0
+      ? 'text-primary'
+      : value < 0
+        ? 'text-error'
+        : 'text-on-surface';
+  return (
+    <div
+      className={`bg-surface-container rounded-xl p-4 border ${
+        emphasis ? 'border-tertiary/30' : 'border-white/5'
+      }`}
+    >
+      <p className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-1">
+        {label}
+      </p>
+      <p className={`font-headline font-bold tabular-nums truncate ${tone}`}>
+        {formatCurrency(value, currency)}
+      </p>
+    </div>
+  );
+}
+
+const TX_TYPE_LABEL: Record<DepotTransactionType, string> = {
+  BUY: 'Kauf',
+  SELL: 'Verkauf',
+  DIVIDEND: 'Dividende',
+  OTHER: 'Sonstiges',
+};
+
+const TX_TYPE_TONE: Record<DepotTransactionType, string> = {
+  BUY: 'bg-primary/15 text-primary border-primary/30',
+  SELL: 'bg-error/15 text-error border-error/30',
+  DIVIDEND: 'bg-tertiary/15 text-tertiary border-tertiary/30',
+  OTHER: 'bg-on-surface/10 text-on-surface-variant border-white/10',
+};
+
+// Above this length, the table starts collapsed. Tuned against the
+// brief — the user wants > 20 rows to fold by default.
+const TX_HISTORY_COLLAPSE_THRESHOLD = 20;
+
+function TxHistoryTable({
+  txs,
+  currency,
+  isPending,
+}: {
+  txs: DepotTransaction[];
+  currency: string;
+  isPending: boolean;
+}) {
+  // Newest-first for the operator's mental model — same default as the
+  // backend's depot-transactions list.
+  const sorted = useMemo<DepotTransaction[]>(
+    () =>
+      [...txs].sort((a, b) => {
+        if (a.booking_date !== b.booking_date) {
+          return a.booking_date < b.booking_date ? 1 : -1;
+        }
+        return a.transaction_id < b.transaction_id ? 1 : -1;
+      }),
+    [txs],
+  );
+
+  const collapsible = sorted.length > TX_HISTORY_COLLAPSE_THRESHOLD;
+  const [expanded, setExpanded] = useState(false);
+  const visible: DepotTransaction[] =
+    collapsible && !expanded ? sorted.slice(0, TX_HISTORY_COLLAPSE_THRESHOLD) : sorted;
+
+  return (
+    <section
+      className="bg-surface-container-lowest rounded-2xl p-5 border border-white/5"
+      aria-labelledby="tx-history-heading"
+    >
+      <div className="flex items-center gap-3 mb-4">
+        <div className="w-9 h-9 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary">
+          <History className="w-4 h-4" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <h3
+            id="tx-history-heading"
+            className="font-headline font-bold text-on-surface text-sm"
+          >
+            Buchungs-Historie
+          </h3>
+          <p className="text-xs text-on-surface-variant">
+            Käufe, Verkäufe und Dividenden für diese ISIN
+            {sorted.length > 0 ? ` (${sorted.length})` : ''}.
+          </p>
+        </div>
+      </div>
+
+      {isPending ? (
+        <div className="space-y-2">
+          {[0, 1, 2].map((i) => (
+            <div key={i} className="h-9 bg-white/5 rounded-lg animate-pulse" />
+          ))}
+        </div>
+      ) : sorted.length === 0 ? (
+        <div className="rounded-xl border border-dashed border-white/10 bg-white/5 px-4 py-6 text-center">
+          <p className="text-xs text-on-surface-variant font-medium leading-relaxed">
+            Keine Depot-Buchungen für diese ISIN gefunden. Falls die Position
+            via Übertrag entstanden ist, ist die Historie u.U. nicht
+            vollständig im k-fin-Cache.
+          </p>
+        </div>
+      ) : (
+        <>
+          <div className="overflow-x-auto -mx-2 px-2">
+            <table className="w-full text-xs tabular-nums">
+              <thead>
+                <tr className="text-left text-[10px] uppercase tracking-widest text-on-surface-variant">
+                  <th scope="col" className="py-2 pr-3 font-bold">Datum</th>
+                  <th scope="col" className="py-2 pr-3 font-bold">Typ</th>
+                  <th scope="col" className="py-2 pr-3 font-bold text-right">Stück</th>
+                  <th scope="col" className="py-2 pr-3 font-bold text-right">Preis</th>
+                  <th scope="col" className="py-2 font-bold text-right">Betrag</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/5">
+                {visible.map((tx) => (
+                  <TxRow key={tx.transaction_id} tx={tx} currency={currency} />
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {collapsible && (
+            <button
+              type="button"
+              onClick={() => setExpanded((v) => !v)}
+              aria-expanded={expanded}
+              className="mt-3 w-full px-3 py-2 text-xs font-bold rounded-lg border border-white/10 bg-surface-container hover:bg-white/5 text-on-surface-variant flex items-center justify-center gap-2 transition-colors"
+            >
+              {expanded ? (
+                <>
+                  <ChevronUp className="w-3.5 h-3.5" />
+                  Weniger anzeigen
+                </>
+              ) : (
+                <>
+                  <ChevronDown className="w-3.5 h-3.5" />
+                  Alle {sorted.length} Buchungen anzeigen
+                </>
+              )}
+            </button>
+          )}
+        </>
+      )}
+    </section>
+  );
+}
+
+// `key?` is included because this project's TS setup doesn't pick up
+// React's `JSX.IntrinsicAttributes` automatically (no @types/react in
+// node_modules) — same workaround as `CategoryCardProps` in Categories.tsx.
+type TxRowProps = { tx: DepotTransaction; currency: string; key?: string };
+
+function TxRow({ tx, currency }: TxRowProps) {
+  // The list is filtered to a single ISIN, so the tx currency should
+  // match the position's currency in the common case. If it doesn't —
+  // e.g. a USD ADR's dividend booked in EUR — keep the tx's own
+  // currency on display so the user sees what the bank actually
+  // recorded, never silently re-format into the position currency.
+  const txCurrency = tx.currency || currency;
+  const type = (tx.transaction_type as DepotTransactionType) ?? 'OTHER';
+  const label = TX_TYPE_LABEL[type] ?? type;
+  const tone = TX_TYPE_TONE[type] ?? TX_TYPE_TONE.OTHER;
+
+  // Dividends have no meaningful per-share price/quantity in the
+  // Comdirect feed — `quantity` is sometimes 0, sometimes the share
+  // count at record date. Suppress the columns to avoid implying
+  // they're acquisition-relevant.
+  const hideQtyPrice = type === 'DIVIDEND';
+
+  return (
+    <tr className="hover:bg-white/5">
+      <td className="py-2 pr-3 text-on-surface-variant whitespace-nowrap">
+        {formatDate(tx.booking_date)}
+      </td>
+      <td className="py-2 pr-3">
+        <span
+          className={`inline-flex items-center px-2 py-0.5 rounded-md border text-[10px] font-bold uppercase tracking-wider ${tone}`}
+        >
+          {label}
+        </span>
+      </td>
+      <td className="py-2 pr-3 text-right text-on-surface">
+        {hideQtyPrice
+          ? '—'
+          : Number(tx.quantity).toLocaleString('de-DE', {
+              maximumFractionDigits: 4,
+            })}
+      </td>
+      <td className="py-2 pr-3 text-right text-on-surface">
+        {hideQtyPrice ? '—' : formatCurrency(tx.price, txCurrency)}
+      </td>
+      <td className="py-2 text-right text-on-surface font-bold">
+        {formatCurrency(tx.amount, txCurrency)}
+      </td>
+    </tr>
   );
 }
 
