@@ -5,7 +5,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
 import { useStartSync, useNormalizeSync, useConfirmSync } from '../api/sync';
-import { useSettings, useUpdateSettings } from '../api/settings';
+import { useSettings, useTestWebhook, useUpdateSettings } from '../api/settings';
 import { useChangePassword } from '../api/auth';
 import BackfillSection from './BackfillSection';
 import RulesSection from './RulesSection';
@@ -35,6 +35,7 @@ export default function Settings() {
   const normalize = useNormalizeSync();
   const settingsQuery = useSettings();
   const updateSettings = useUpdateSettings();
+  const testWebhook = useTestWebhook();
   const changePassword = useChangePassword();
   const [thresholdDraft, setThresholdDraft] = useState<number>(0.6);
 
@@ -45,6 +46,10 @@ export default function Settings() {
   const [webhookError, setWebhookError] = useState<string | null>(null);
   const [webhookSaved, setWebhookSaved] = useState(false);
   const [webhookBackendMissing, setWebhookBackendMissing] = useState(false);
+  const [webhookTestResult, setWebhookTestResult] = useState<{
+    ok: boolean;
+    message: string;
+  } | null>(null);
 
   // Change-password form state
   const [currentPw, setCurrentPw] = useState('');
@@ -131,6 +136,31 @@ export default function Settings() {
       setWebhookError(
         extractError(err, 'Webhook konnte nicht gespeichert werden'),
       );
+    }
+  };
+
+  const handleTestWebhook = async () => {
+    setWebhookTestResult(null);
+    try {
+      const res = await testWebhook.mutateAsync();
+      if (res.success) {
+        setWebhookTestResult({
+          ok: true,
+          message: `Test-Send erfolgreich (HTTP ${res.status_code ?? '—'}).`,
+        });
+      } else {
+        setWebhookTestResult({
+          ok: false,
+          message: res.error
+            ? `Discord lehnte ab: ${res.error}`
+            : `Discord lehnte ab (HTTP ${res.status_code ?? '—'}).`,
+        });
+      }
+    } catch (err) {
+      setWebhookTestResult({
+        ok: false,
+        message: extractError(err, 'Test-Send fehlgeschlagen'),
+      });
     }
   };
 
@@ -352,18 +382,37 @@ export default function Settings() {
                 Webhook gespeichert.
               </p>
             )}
+            {webhookTestResult && (
+              <p
+                className={`text-xs font-bold ${
+                  webhookTestResult.ok ? 'text-primary' : 'text-red-400'
+                }`}
+                role="status"
+              >
+                {webhookTestResult.message}
+              </p>
+            )}
             <div className="flex items-center justify-between gap-3 pt-1">
               <p className="text-[11px] text-on-surface-variant">
-                Leer lassen zum Deaktivieren. Test-Send folgt mit Stream D.
+                Leer lassen zum Deaktivieren. Test-Send sendet eine
+                Demo-Nachricht an die gespeicherte URL.
               </p>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  disabled
-                  title="Verfügbar sobald das Backend den Webhook akzeptiert (Wave 1 Stream D)."
-                  className="bg-surface-container-high text-on-surface-variant px-3 py-2 rounded-lg text-xs font-bold opacity-50 cursor-not-allowed"
+                  onClick={handleTestWebhook}
+                  disabled={
+                    testWebhook.isPending ||
+                    !settingsQuery.data?.webhook_url
+                  }
+                  title={
+                    settingsQuery.data?.webhook_url
+                      ? 'Sendet eine Demo-Embed-Nachricht an die gespeicherte URL.'
+                      : 'Erst URL speichern, dann testen.'
+                  }
+                  className="bg-surface-container-high text-on-surface px-3 py-2 rounded-lg text-xs font-bold hover:bg-surface-container-highest transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                 >
-                  Test-Send (demnächst)
+                  {testWebhook.isPending ? 'Sende…' : 'Test-Send'}
                 </button>
                 <button
                   type="button"
