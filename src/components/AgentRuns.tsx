@@ -25,6 +25,7 @@ import {
   useTriggerFullPipeline,
   useTriggerRun,
 } from '../api/runs';
+import { useSettings } from '../api/settings';
 import { formatDate } from '../lib/format';
 import type { AgentName, Run, RunStatus } from '../api/types';
 
@@ -131,14 +132,18 @@ function estimatedSeconds(runs: Run[] | undefined, agent: string): number | null
   return Math.round(total / finished.length);
 }
 
-// We load enough rows to cover a typical month of activity for the
-// cost-tracking summary card. Anything beyond this is *not* aggregated —
-// the card is honest about that ("letzte N Runs in diesem Monat").
-const RUNS_LIST_LIMIT = 50;
+// Default page size while user-settings are still loading. Mirrors the
+// backend's hard default — once `useSettings` resolves we switch to the
+// user's persisted `page_size`. The cost-summary card honestly labels
+// the cap so a smaller page size shows fewer aggregated runs and a
+// larger one shows more.
+const DEFAULT_RUNS_LIST_LIMIT = 50;
 
 export default function AgentRuns() {
+  const { data: settingsData } = useSettings();
+  const runsListLimit = settingsData?.page_size ?? DEFAULT_RUNS_LIST_LIMIT;
   const { data: runsData, isPending: isHistoryPending } = useRuns({
-    limit: RUNS_LIST_LIMIT,
+    limit: runsListLimit,
   });
   const { mutate: triggerRun, isPending: isTriggering, variables: triggeringAgent } =
     useTriggerRun();
@@ -268,7 +273,7 @@ export default function AgentRuns() {
       <MonthlyCostCard
         summary={monthSummary}
         sampleSize={runsData?.items.length ?? 0}
-        sampleCap={RUNS_LIST_LIMIT}
+        sampleCap={runsListLimit}
         isPending={isHistoryPending}
       />
 
@@ -1032,11 +1037,12 @@ function PeriodPicker({
 
 // ── Monthly cost summary ──────────────────────────────────────────────
 //
-// Aggregated *client-side* over the runs already in the table — currently
-// the most recent RUNS_LIST_LIMIT (= 50). When the user has more than 50
-// runs in the current month the card is upfront about the truncation.
-// A real server-side aggregate is out of scope for Wave 1; tracked as a
-// follow-up.
+// Aggregated *client-side* over the runs already in the table — the
+// row count follows the user's `page_size` setting (`useSettings`),
+// defaulting to 50 while settings are loading. When the user has more
+// runs in the current month than fit on one page, the card is upfront
+// about the truncation. A real server-side aggregate is out of scope
+// for Wave 1; tracked as a follow-up.
 
 type MonthSummary = {
   runCount: number;
