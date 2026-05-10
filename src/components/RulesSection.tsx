@@ -8,14 +8,26 @@ import {
   type SetStateAction,
 } from 'react';
 import { isAxiosError } from 'axios';
-import { ListFilter, Pencil, Plus, Save, Trash2, X } from 'lucide-react';
+import {
+  CheckCircle2,
+  Hourglass,
+  ListFilter,
+  Pencil,
+  Plus,
+  Save,
+  Trash2,
+  Wand2,
+  X,
+} from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import {
+  useApplyAllRules,
   useCategories,
   useCreateRule,
   useDeleteRule,
   useRules,
   useUpdateRule,
+  type RulesApplyResult,
 } from '../api/categories';
 import { useTransactions } from '../api/transactions';
 import type { CategoryRule, Transaction } from '../api/types';
@@ -66,18 +78,32 @@ const EMPTY_FORM: RuleFormState = {
   priority: 0,
 };
 
+// Status banner shown after a successful apply-all run. Tracks both
+// synchronous (200, counts populated) and asynchronous (202, counts
+// null + accepted=true) responses so the UI can phrase the outcome
+// appropriately.
+type ApplyAllOutcome =
+  | { kind: 'sync'; result: RulesApplyResult }
+  | { kind: 'async' }
+  | { kind: 'error'; message: string };
+
 export default function RulesSection() {
   const { data: rules, isPending: rulesPending, error: rulesError } = useRules();
   const { data: categories } = useCategories();
   const createRule = useCreateRule();
   const updateRule = useUpdateRule();
   const deleteRule = useDeleteRule();
+  const applyAll = useApplyAllRules();
 
   const [mode, setMode] = useState<EditMode>({ kind: 'create' });
   const [form, setForm] = useState<RuleFormState>(EMPTY_FORM);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [confirmApplyAll, setConfirmApplyAll] = useState(false);
+  const [applyAllOutcome, setApplyAllOutcome] = useState<ApplyAllOutcome | null>(
+    null,
+  );
 
   // Default category for the create form once categories load.
   useEffect(() => {
@@ -181,13 +207,32 @@ export default function RulesSection() {
   const showRulesEmptyHint =
     !rulesPending && !rulesError && sortedRules.length === 0;
 
+  const hasRules = sortedRules.length > 0;
+
+  const handleConfirmApplyAll = async () => {
+    setApplyAllOutcome(null);
+    try {
+      const { result, accepted } = await applyAll.mutateAsync();
+      setApplyAllOutcome(
+        accepted ? { kind: 'async' } : { kind: 'sync', result },
+      );
+      setConfirmApplyAll(false);
+    } catch (err) {
+      setApplyAllOutcome({
+        kind: 'error',
+        message: extractError(err, 'Anwendung fehlgeschlagen'),
+      });
+      setConfirmApplyAll(false);
+    }
+  };
+
   return (
     <section className="bg-surface-container-low rounded-2xl border border-white/5 p-6">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary">
+      <div className="flex items-start gap-3 mb-6">
+        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center text-primary shrink-0">
           <ListFilter className="w-5 h-5" />
         </div>
-        <div>
+        <div className="flex-1 min-w-0">
           <h3 className="font-headline font-bold text-on-surface">
             Kategorisierungs-Regeln
           </h3>
@@ -198,7 +243,29 @@ export default function RulesSection() {
             «Sender · Empfänger · Verwendungszweck».
           </p>
         </div>
+        {hasRules && (
+          <button
+            type="button"
+            onClick={() => {
+              setApplyAllOutcome(null);
+              setConfirmApplyAll(true);
+            }}
+            disabled={applyAll.isPending}
+            className="shrink-0 inline-flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-bold bg-secondary/15 text-secondary border border-secondary/30 hover:bg-secondary/25 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            title="Wendet alle Regeln auf bereits importierte, noch unkategorisierte Transaktionen an."
+          >
+            <Wand2 className="w-3.5 h-3.5" />
+            Auf bestehende Tx anwenden
+          </button>
+        )}
       </div>
+
+      {applyAllOutcome && (
+        <ApplyAllStatusBanner
+          outcome={applyAllOutcome}
+          onDismiss={() => setApplyAllOutcome(null)}
+        />
+      )}
 
       <RuleForm
         mode={mode}
@@ -363,8 +430,167 @@ export default function RulesSection() {
             </motion.div>
           </motion.div>
         )}
+        {confirmApplyAll && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-6"
+            onClick={
+              applyAll.isPending ? undefined : () => setConfirmApplyAll(false)
+            }
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.96, y: 8 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.96 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md bg-surface-container-low border border-white/5 rounded-3xl p-8 shadow-2xl"
+            >
+              <div className="flex items-start justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-secondary/10 flex items-center justify-center text-secondary">
+                    <Wand2 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="font-headline font-bold text-on-surface">
+                      Regeln auf bestehende Transaktionen anwenden?
+                    </h3>
+                    <p className="text-xs text-on-surface-variant">
+                      Wirkt nur auf Transaktionen ohne Kategorie. Bereits
+                      zugeordnete Tx bleiben unverändert.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setConfirmApplyAll(false)}
+                  disabled={applyAll.isPending}
+                  className="text-on-surface-variant hover:text-on-surface disabled:opacity-30"
+                  aria-label="Schließen"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
+                Bei mehr als 1.000 unkategorisierten Transaktionen läuft der
+                Scan im Hintergrund — das Ergebnis erscheint dann in der
+                Transaktionsliste, ohne dass du hier warten musst.
+              </p>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => setConfirmApplyAll(false)}
+                  disabled={applyAll.isPending}
+                  className="flex-1 bg-surface-container-high hover:bg-surface-container-highest py-3 rounded-xl text-sm font-bold text-on-surface transition-all disabled:opacity-50"
+                >
+                  Abbrechen
+                </button>
+                <button
+                  onClick={handleConfirmApplyAll}
+                  disabled={applyAll.isPending}
+                  className="flex-1 bg-secondary text-on-secondary py-3 rounded-xl text-sm font-bold hover:brightness-110 transition-all disabled:opacity-50"
+                >
+                  {applyAll.isPending ? 'Wende an…' : 'Ja, anwenden'}
+                </button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
       </AnimatePresence>
     </section>
+  );
+}
+
+// ─── Apply-all status banner ────────────────────────────────────────
+//
+// Inline status after a successful apply-all run. Sticks around until
+// the user dismisses it explicitly — the counts can be useful while
+// the user investigates which categories were filled in.
+
+function ApplyAllStatusBanner({
+  outcome,
+  onDismiss,
+}: {
+  outcome: ApplyAllOutcome;
+  onDismiss: () => void;
+}) {
+  if (outcome.kind === 'error') {
+    return (
+      <div
+        className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-error/30 bg-error/10 px-4 py-3"
+        role="alert"
+      >
+        <div className="flex items-start gap-2">
+          <X className="w-4 h-4 mt-0.5 text-error shrink-0" />
+          <p className="text-xs font-bold text-error leading-relaxed">
+            {outcome.message}
+          </p>
+        </div>
+        <button
+          onClick={onDismiss}
+          className="text-on-surface-variant hover:text-on-surface shrink-0"
+          aria-label="Hinweis schließen"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
+  if (outcome.kind === 'async') {
+    return (
+      <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-primary/30 bg-primary/10 px-4 py-3">
+        <div className="flex items-start gap-2">
+          <Hourglass className="w-4 h-4 mt-0.5 text-primary shrink-0" />
+          <div className="text-xs leading-relaxed">
+            <p className="font-bold text-on-surface">
+              Läuft im Hintergrund
+            </p>
+            <p className="text-on-surface-variant">
+              Mehr als 1.000 unkategorisierte Transaktionen — das Ergebnis
+              wird im nächsten Sync sichtbar.
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onDismiss}
+          className="text-on-surface-variant hover:text-on-surface shrink-0"
+          aria-label="Hinweis schließen"
+        >
+          <X className="w-4 h-4" />
+        </button>
+      </div>
+    );
+  }
+  const { processed, matched, unchanged } = outcome.result;
+  return (
+    <div className="mb-4 flex items-start justify-between gap-3 rounded-lg border border-secondary/30 bg-secondary/10 px-4 py-3">
+      <div className="flex items-start gap-2">
+        <CheckCircle2 className="w-4 h-4 mt-0.5 text-secondary shrink-0" />
+        <div className="text-xs leading-relaxed">
+          <p className="font-bold text-on-surface">
+            Regeln angewandt
+          </p>
+          <p className="text-on-surface-variant tabular-nums">
+            <span className="font-bold text-on-surface">{matched ?? 0}</span>{' '}
+            zugeordnet,{' '}
+            <span className="text-on-surface-variant">
+              {unchanged ?? 0} unverändert
+            </span>{' '}
+            <span className="text-on-surface-variant/60">
+              (Σ {processed ?? 0} geprüft)
+            </span>
+          </p>
+        </div>
+      </div>
+      <button
+        onClick={onDismiss}
+        className="text-on-surface-variant hover:text-on-surface shrink-0"
+        aria-label="Hinweis schließen"
+      >
+        <X className="w-4 h-4" />
+      </button>
+    </div>
   );
 }
 

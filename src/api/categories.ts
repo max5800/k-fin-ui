@@ -174,3 +174,36 @@ export function useDeleteRule() {
     },
   });
 }
+
+// Result of POST /categories/rules/apply-all. Mirrors
+// `RulesApplyResult` in src/api/schemas.py — the count fields are
+// nullable on a 202 (async) response and populated on a 200 (sync)
+// response.
+export type RulesApplyResult = {
+  status: string;
+  processed: number | null;
+  matched: number | null;
+  unchanged: number | null;
+};
+
+// POST /categories/rules/apply-all — re-runs the existing rule set
+// over every uncategorized transaction. Returns 200 + counts when
+// <= 1000 rows are scanned, otherwise 202 with a background task and
+// `status='accepted'`. The mutation invalidates both the rules cache
+// and the transactions cache: the matched rows now carry a category,
+// so any open transactions list must refetch.
+export function useApplyAllRules() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: async (): Promise<{ result: RulesApplyResult; accepted: boolean }> => {
+      const response = await apiClient.post<RulesApplyResult>(
+        '/categories/rules/apply-all',
+      );
+      return { result: response.data, accepted: response.status === 202 };
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.rules.all });
+      queryClient.invalidateQueries({ queryKey: qk.transactions.all });
+    },
+  });
+}

@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type FormEvent } from 'react';
+import { isAxiosError } from 'axios';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -22,6 +23,7 @@ import { z } from 'zod';
 import {
   useBudgets,
   useCategories,
+  useCreateCategory,
   useUpsertBudget,
 } from '../api/categories';
 import { useBudgetSpending, useMonthlySummary } from '../api/aggregates';
@@ -238,6 +240,8 @@ export default function Categories() {
               onToggleFilter={(t) => setFilter((cur) => (cur === t ? null : t))}
             />
           )}
+
+          <CreateCategoryForm existingCategories={categories ?? []} />
 
           <div className="flex items-center justify-between gap-3 flex-wrap">
             <h4 className="text-lg font-headline font-bold text-on-surface">
@@ -840,4 +844,169 @@ function BudgetDrawer({
       </div>
     </motion.aside>
   );
+}
+
+// ── Inline-Form: neue Kategorie anlegen ────────────────────────────────
+//
+// Backend `CategoryCreate` (src/api/schemas.py) akzeptiert `id` (optional —
+// wird vom Backend abgeleitet wenn leer), `name` und `type`. `type` ist
+// derzeit ein einfacher String; das DB-Modell erlaubt jeden Wert, aber
+// die übrige UI rechnet nur mit "expense" / "income" — die Picker hier
+// spiegeln das wider und lassen den Power-User trotzdem manuell etwas
+// anderes eintippen, falls der Bedarf entsteht.
+
+const CATEGORY_TYPE_OPTIONS: Array<{ value: string; label: string }> = [
+  { value: 'expense', label: 'Ausgabe' },
+  { value: 'income', label: 'Einnahme' },
+];
+
+function CreateCategoryForm({
+  existingCategories,
+}: {
+  existingCategories: { id: string; name: string }[];
+}) {
+  const createCategory = useCreateCategory();
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [type, setType] = useState<string>('expense');
+  const [createError, setCreateError] = useState<string | null>(null);
+
+  const reset = () => {
+    setName('');
+    setType('expense');
+    setCreateError(null);
+  };
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setCreateError(null);
+    const trimmed = name.trim();
+    if (!trimmed) {
+      setCreateError('Name darf nicht leer sein');
+      return;
+    }
+    if (
+      existingCategories.some(
+        (c) => c.name.toLowerCase() === trimmed.toLowerCase(),
+      )
+    ) {
+      setCreateError('Kategorie mit diesem Namen existiert bereits');
+      return;
+    }
+    try {
+      // `id` weglassen — der Server leitet ihn aus dem Namen ab und
+      // garantiert Uniqueness auch im Edge-Case zweier Aufrufe parallel.
+      await createCategory.mutateAsync({ name: trimmed, type });
+      reset();
+      setOpen(false);
+    } catch (err) {
+      setCreateError(extractCreateError(err));
+    }
+  };
+
+  if (!open) {
+    return (
+      <div className="flex justify-end">
+        <button
+          type="button"
+          onClick={() => setOpen(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 text-xs font-bold text-on-surface bg-surface-container hover:bg-surface-container-high rounded-lg transition-colors border border-white/5"
+        >
+          <Plus className="w-4 h-4" />
+          Neue Kategorie
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <section className="bg-surface-container-low rounded-2xl border border-primary/30 p-6">
+      <div className="flex items-center justify-between mb-4">
+        <h4 className="text-sm font-bold uppercase tracking-widest text-on-surface">
+          Neue Kategorie anlegen
+        </h4>
+        <button
+          type="button"
+          onClick={() => {
+            reset();
+            setOpen(false);
+          }}
+          disabled={createCategory.isPending}
+          className="text-on-surface-variant hover:text-on-surface transition-colors disabled:opacity-30"
+          aria-label="Schließen"
+        >
+          <X className="w-5 h-5" />
+        </button>
+      </div>
+      <form
+        onSubmit={handleSubmit}
+        className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end"
+      >
+        <div className="md:col-span-7 space-y-1">
+          <label
+            htmlFor="new-category-name"
+            className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+          >
+            Name
+          </label>
+          <input
+            id="new-category-name"
+            type="text"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="z. B. Hobby"
+            autoFocus
+            maxLength={64}
+            className="w-full bg-surface-container-lowest px-3 py-2.5 rounded-lg text-sm text-on-surface outline-none border border-transparent focus:border-primary/50 transition-all placeholder:text-on-surface-variant/40"
+          />
+        </div>
+        <div className="md:col-span-3 space-y-1">
+          <label
+            htmlFor="new-category-type"
+            className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant"
+          >
+            Typ
+          </label>
+          <select
+            id="new-category-type"
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            className="w-full bg-surface-container-lowest px-3 py-2.5 rounded-lg text-sm text-on-surface outline-none border border-transparent focus:border-primary/50 transition-all"
+          >
+            {CATEGORY_TYPE_OPTIONS.map((opt) => (
+              <option key={opt.value} value={opt.value}>
+                {opt.label}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="md:col-span-2">
+          <button
+            type="submit"
+            disabled={createCategory.isPending || !name.trim()}
+            className="w-full bg-primary text-on-primary px-4 py-2.5 rounded-lg text-sm font-bold flex items-center justify-center gap-2 hover:brightness-110 transition-all disabled:opacity-50"
+          >
+            <Plus className="w-4 h-4" />
+            {createCategory.isPending ? 'Lege an…' : 'Anlegen'}
+          </button>
+        </div>
+      </form>
+      {createError && (
+        <p className="mt-3 text-xs text-error font-bold" role="alert">
+          {createError}
+        </p>
+      )}
+    </section>
+  );
+}
+
+function extractCreateError(err: unknown): string {
+  if (isAxiosError(err)) {
+    const detail = err.response?.data?.detail;
+    if (typeof detail === 'string') return detail;
+    if (Array.isArray(detail) && detail[0]?.msg) {
+      return String(detail[0].msg);
+    }
+  }
+  return 'Kategorie konnte nicht angelegt werden';
 }
