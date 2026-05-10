@@ -1,3 +1,10 @@
+# [1.15.0](https://github.com/max5800/k-fin-ui/compare/v1.14.0...v1.15.0) (2026-05-10)
+
+
+### Features
+
+* **settings:** wire discord webhook test-send button to backend ([#7](https://github.com/max5800/k-fin-ui/issues/7)) ([7d89234](https://github.com/max5800/k-fin-ui/commit/7d892342b448383413dc972209759d6b3eae3029))
+
 # [1.14.0](https://github.com/max5800/k-fin-ui/compare/v1.13.0...v1.14.0) (2026-05-09)
 
 
