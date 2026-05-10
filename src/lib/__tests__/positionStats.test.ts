@@ -26,6 +26,8 @@ describe('computeCostBasis', () => {
       avgCostPerShare: 0,
       remainingCostBasis: 0,
       realizedPnl: 0,
+      salesPnl: 0,
+      dividendsPnl: 0,
       unrealizedPnl: 0,
       totalPnl: 0,
       currentQuantity: 0,
@@ -119,8 +121,49 @@ describe('computeCostBasis', () => {
     expect(stats.currentQuantity).toBe(10);
     expect(stats.remainingCostBasis).toBe(1000);
     expect(stats.realizedPnl).toBe(25);
+    // Split: dividends are tracked separately from sale-side P&L so
+    // the user can map them to Anlage KAP "Kapitalerträge" cleanly.
+    expect(stats.dividendsPnl).toBe(25);
+    expect(stats.salesPnl).toBe(0);
     expect(stats.unrealizedPnl).toBe(100); // 1100 - 1000
     expect(stats.totalPnl).toBe(125);
+  });
+
+  it('splits realised P&L into sales and dividends', () => {
+    // Buy 10 @ 100 (cost 1000), receive 30 EUR dividend, then sell 4
+    // @ 130 (proceeds 520). Sale-cost = 4 × 100 = 400, salesPnl = 120.
+    // Combined realized = 120 + 30 = 150.
+    const txs = [
+      mkTx({
+        transaction_id: 'A',
+        booking_date: '2026-01-01',
+        transaction_type: 'BUY',
+        quantity: 10,
+        price: 100,
+        amount: 1000,
+      }),
+      mkTx({
+        transaction_id: 'B',
+        booking_date: '2026-04-01',
+        transaction_type: 'DIVIDEND',
+        quantity: 10,
+        price: 0,
+        amount: 30,
+      }),
+      mkTx({
+        transaction_id: 'C',
+        booking_date: '2026-06-01',
+        transaction_type: 'SELL',
+        quantity: 4,
+        price: 130,
+        amount: 520,
+      }),
+    ];
+    const stats = computeCostBasis(txs, 720); // 6 × 120 current price
+    expect(stats.salesPnl).toBe(120);
+    expect(stats.dividendsPnl).toBe(30);
+    expect(stats.realizedPnl).toBe(150); // sales + dividends
+    expect(stats.currentQuantity).toBe(6);
   });
 
   it('walks transactions chronologically regardless of input order', () => {

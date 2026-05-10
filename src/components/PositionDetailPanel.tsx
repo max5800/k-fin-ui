@@ -711,16 +711,27 @@ function PnlCard({ stats, currency, isPending, txCount }: PnlCardProps) {
       )}
 
       {isPending ? (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="h-16 bg-white/5 rounded-xl animate-pulse" />
           <div className="h-16 bg-white/5 rounded-xl animate-pulse" />
           <div className="h-16 bg-white/5 rounded-xl animate-pulse" />
           <div className="h-16 bg-white/5 rounded-xl animate-pulse" />
         </div>
       ) : (
-        <div className="grid grid-cols-3 gap-3">
+        // 2×2 grid so the user can reconcile sales- and dividend-side
+        // P&L against Anlage KAP separately. Sales and dividends are
+        // both pre-tax / brutto figures from the Comdirect feed —
+        // KapSt + Soli are not yet deducted here.
+        <div className="grid grid-cols-2 gap-3">
           <PnlTile
-            label="Realisiert (Ø-Methode)"
-            value={stats.realizedPnl}
+            label="Realisiert (Verkäufe, Ø)"
+            value={stats.salesPnl}
+            currency={currency}
+            uncertain={uncertain}
+          />
+          <PnlTile
+            label="Dividenden (brutto)"
+            value={stats.dividendsPnl}
             currency={currency}
             uncertain={uncertain}
           />
