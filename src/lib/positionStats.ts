@@ -48,14 +48,18 @@ export type CostBasisStats = {
   /** Net BUY − SELL quantity walked through the chronology. */
   currentQuantity: number;
   /**
-   * True when a SELL appeared before any BUY — the underlying ledger
-   * is incomplete (e.g. transfer-in not represented as BUY) and
-   * numbers should be shown with a warning.
+   * True when the dataset is missing earlier transactions — either a
+   * SELL appeared before any BUY, or a SELL exceeded the running
+   * held-quantity (see `oversold`). Both indicate the cost basis is
+   * reconstructed from an incomplete ledger and the numbers should
+   * be shown with a warning.
    */
   ledgerIncomplete: boolean;
   /**
-   * True when the running quantity drops below zero on a SELL — same
-   * ledger-incomplete signal, distinct so we can phrase the warning.
+   * True when the running quantity drops below zero on a SELL — set
+   * alongside `ledgerIncomplete` and kept distinct so the UI can
+   * phrase the warning specifically (more shares sold than ever
+   * bought in the visible window).
    */
   oversold: boolean;
 };
@@ -96,10 +100,23 @@ export function computeCostBasis(
         continue;
       }
       const sellQty = Math.min(txQty, qty);
-      if (sellQty < txQty) oversold = true;
       const avgPerShare = remainingCost / qty;
       const soldCost = avgPerShare * sellQty;
-      realized += txAmount - soldCost;
+      if (sellQty < txQty) {
+        // Oversold path: the depot was loaded mid-stream and earlier
+        // BUYs are missing, so we only own `sellQty` of the `txQty`
+        // shares the user is reporting as sold. Pro-rate proceeds to
+        // the held share — otherwise we'd credit the *full* sale
+        // amount against the cost of just the held slice and inflate
+        // realized P&L. Also flag `ledgerIncomplete` so the warning
+        // in the UI keeps surfacing the uncertainty.
+        oversold = true;
+        ledgerIncomplete = true;
+        const proceedsForHeldShare = (txAmount * sellQty) / txQty;
+        realized += proceedsForHeldShare - soldCost;
+      } else {
+        realized += txAmount - soldCost;
+      }
       remainingCost -= soldCost;
       qty -= sellQty;
     } else if (tx.transaction_type === 'DIVIDEND') {
