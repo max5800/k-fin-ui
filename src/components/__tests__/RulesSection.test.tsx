@@ -16,6 +16,7 @@ const mockUseTransactions = vi.fn();
 const mockCreateMutate = vi.fn();
 const mockUpdateMutate = vi.fn();
 const mockDeleteMutate = vi.fn();
+const mockApplyAllMutate = vi.fn();
 
 vi.mock('../../api/categories', () => ({
   useRules: () => mockUseRules(),
@@ -30,6 +31,10 @@ vi.mock('../../api/categories', () => ({
   }),
   useDeleteRule: () => ({
     mutateAsync: mockDeleteMutate,
+    isPending: false,
+  }),
+  useApplyAllRules: () => ({
+    mutateAsync: mockApplyAllMutate,
     isPending: false,
   }),
 }));
