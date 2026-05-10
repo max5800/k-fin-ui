@@ -653,7 +653,13 @@ type PnlCardProps = {
 };
 
 function PnlCard({ stats, currency, isPending, txCount }: PnlCardProps) {
-  const showWarning = stats.ledgerIncomplete || stats.oversold;
+  // When the ledger is incomplete (SELL before BUY) or oversold (more
+  // sold than ever bought in the visible window), the cost basis and
+  // therefore every P&L number is reconstructed from a partial set
+  // of transactions. Render the tiles in a neutral tone and tag each
+  // value with `~` so the user can't mistake a phantom-gain figure
+  // for a confirmed Winner-Position.
+  const uncertain = stats.ledgerIncomplete || stats.oversold;
   return (
     <section
       className="bg-surface-container-lowest rounded-2xl p-5 border border-white/5"
@@ -685,6 +691,25 @@ function PnlCard({ stats, currency, isPending, txCount }: PnlCardProps) {
         </span>
       </div>
 
+      {uncertain && !isPending && (
+        <div
+          role="alert"
+          className="mb-4 flex gap-3 p-3 rounded-xl bg-amber-400/10 border border-amber-400/30"
+        >
+          <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
+          <div className="text-xs">
+            <p className="font-bold text-amber-300 mb-1">
+              Lückenhafte Buchungshistorie — P&amp;L-Schätzung kann falsch sein
+            </p>
+            <p className="text-on-surface-variant">
+              {stats.oversold
+                ? 'Es wurden mehr Stücke verkauft, als BUY-Buchungen vorliegen — die ältesten Käufe fehlen vermutlich im Datensatz. Realisierter P&L ist näherungsweise.'
+                : 'Verkäufe vor erstem BUY — Comdirect-Historie reicht nicht weit genug zurück. Kostenbasis kann unvollständig sein.'}
+            </p>
+          </div>
+        </div>
+      )}
+
       {isPending ? (
         <div className="grid grid-cols-3 gap-3">
           <div className="h-16 bg-white/5 rounded-xl animate-pulse" />
@@ -697,17 +722,20 @@ function PnlCard({ stats, currency, isPending, txCount }: PnlCardProps) {
             label="Realisiert (Ø-Methode)"
             value={stats.realizedPnl}
             currency={currency}
+            uncertain={uncertain}
           />
           <PnlTile
             label="Unrealisiert"
             value={stats.unrealizedPnl}
             currency={currency}
+            uncertain={uncertain}
           />
           <PnlTile
             label="Gesamt"
             value={stats.totalPnl}
             currency={currency}
             emphasis
+            uncertain={uncertain}
           />
         </div>
       )}
@@ -726,23 +754,6 @@ function PnlCard({ stats, currency, isPending, txCount }: PnlCardProps) {
           </span>
         </p>
       )}
-
-      {showWarning && !isPending && (
-        <div
-          role="status"
-          className="mt-4 flex gap-3 p-3 rounded-xl bg-amber-400/10 border border-amber-400/30"
-        >
-          <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
-          <div className="text-xs">
-            <p className="font-bold text-amber-300 mb-1">Lückenhafte Historie</p>
-            <p className="text-on-surface-variant">
-              {stats.oversold
-                ? 'Es wurden mehr Stücke verkauft, als BUY-Buchungen vorliegen — die ältesten Käufe fehlen vermutlich im Datensatz. Realisierter P&L ist näherungsweise.'
-                : 'Verkäufe vor erstem BUY — Comdirect-Historie reicht nicht weit genug zurück. Kostenbasis kann unvollständig sein.'}
-            </p>
-          </div>
-        </div>
-      )}
     </section>
   );
 }
@@ -752,32 +763,49 @@ function PnlTile({
   value,
   currency,
   emphasis = false,
+  uncertain = false,
 }: {
   label: string;
   value: number;
   currency: string;
   emphasis?: boolean;
+  uncertain?: boolean;
 }) {
   // Sign-driven color so the user reads the row at a glance. Tile is
   // neutral when value is exactly 0 (matches the row hover state in
-  // the parent table for consistency).
-  const tone =
-    value > 0
+  // the parent table for consistency). When the underlying ledger is
+  // incomplete, force a neutral tone regardless of sign and prefix
+  // the value with `~` — green/red on a phantom-gain number reads as
+  // a Winner-Position to a glancing user.
+  const tone = uncertain
+    ? 'text-on-surface-variant'
+    : value > 0
       ? 'text-primary'
       : value < 0
         ? 'text-error'
         : 'text-on-surface';
+  const formatted = formatCurrency(value, currency);
+  // `~` on a positive value sits before any leading sign space — keep
+  // it visually distinct from the digits ("~+150 €" not "+~150 €").
+  const display = uncertain ? `~${formatted}` : formatted;
   return (
     <div
       className={`bg-surface-container rounded-xl p-4 border ${
-        emphasis ? 'border-tertiary/30' : 'border-white/5'
+        emphasis && !uncertain ? 'border-tertiary/30' : 'border-white/5'
       }`}
     >
       <p className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold mb-1">
         {label}
       </p>
-      <p className={`font-headline font-bold tabular-nums truncate ${tone}`}>
-        {formatCurrency(value, currency)}
+      <p
+        className={`font-headline font-bold tabular-nums truncate ${tone}`}
+        aria-label={
+          uncertain
+            ? `${label} (Schätzung): ${formatted}`
+            : `${label}: ${formatted}`
+        }
+      >
+        {display}
       </p>
     </div>
   );
