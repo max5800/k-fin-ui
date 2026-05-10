@@ -1,3 +1,10 @@
+## [1.16.1](https://github.com/max5800/k-fin-ui/compare/v1.16.0...v1.16.1) (2026-05-10)
+
+
+### Bug Fixes
+
+* **portfolio:** finance-review P&L corrections + UI polish ([#10](https://github.com/max5800/k-fin-ui/issues/10)) ([717e596](https://github.com/max5800/k-fin-ui/commit/717e596613ec29369020357b4061db0616617296))
+
 # [1.16.0](https://github.com/max5800/k-fin-ui/compare/v1.15.0...v1.16.0) (2026-05-10)
 
 
