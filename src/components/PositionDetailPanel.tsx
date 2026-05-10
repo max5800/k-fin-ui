@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Download,
   History,
+  Info,
   PieChart,
   Save,
   TrendingUp,
@@ -670,8 +671,7 @@ function PnlCard({ stats, currency, isPending, txCount }: PnlCardProps) {
             Kumulierter P&amp;L
           </h3>
           <p className="text-xs text-on-surface-variant">
-            Aus {txCount} Buchung{txCount === 1 ? '' : 'en'} dieser ISIN
-            (gewichteter Durchschnitt).
+            Aus {txCount} Buchung{txCount === 1 ? '' : 'en'} dieser ISIN.
           </p>
         </div>
         <span
@@ -694,7 +694,7 @@ function PnlCard({ stats, currency, isPending, txCount }: PnlCardProps) {
       ) : (
         <div className="grid grid-cols-3 gap-3">
           <PnlTile
-            label="Realisiert"
+            label="Realisiert (Ø-Methode)"
             value={stats.realizedPnl}
             currency={currency}
           />
@@ -710,6 +710,21 @@ function PnlCard({ stats, currency, isPending, txCount }: PnlCardProps) {
             emphasis
           />
         </div>
+      )}
+
+      {!isPending && (
+        <p
+          className="mt-3 text-[11px] text-on-surface-variant leading-relaxed flex items-start gap-1.5"
+          role="note"
+        >
+          <Info className="w-3.5 h-3.5 shrink-0 mt-0.5 text-on-surface-variant" />
+          <span>
+            P&amp;L hier ist <span className="font-bold">gewichteter Durchschnitt</span>.
+            Steuerlich relevant ist die <span className="font-bold">FIFO</span>-Berechnung
+            der Comdirect (§20 EStG für Wertpapiere ab 2009) — siehe
+            Jahressteuerbescheinigung.
+          </span>
+        </p>
       )}
 
       {showWarning && !isPending && (
