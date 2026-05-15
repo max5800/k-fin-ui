@@ -39,7 +39,8 @@ export type CategoryRuleUpdate = Partial<CategoryRuleCreate>;
 
 export type Transaction = {
   id: string;
-  comdirect_id: string | null;
+  source: string;
+  external_id: string | null;
   booking_date: string;
   valuation_date: string;
   amount: number;

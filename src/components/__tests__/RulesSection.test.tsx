@@ -49,7 +49,8 @@ const transport: Category = { id: 'cat-transport', name: 'Transport', type: 'exp
 function makeTx(partial: Partial<Transaction> & Pick<Transaction, 'id'>): Transaction {
   return {
     id: partial.id,
-    comdirect_id: null,
+    source: 'comdirect',
+    external_id: null,
     booking_date: '2026-05-01',
     valuation_date: '2026-05-01',
     amount: -12.34,
