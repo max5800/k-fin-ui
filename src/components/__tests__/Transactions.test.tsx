@@ -37,7 +37,8 @@ function renderTransactions(initialEntries: string[] = ['/transactions']) {
 
 const sampleTx: Transaction = {
   id: 'txn-1',
-  comdirect_id: 'CD001',
+  source: 'comdirect',
+  external_id: 'CD001',
   booking_date: '2026-04-10',
   valuation_date: '2026-04-10',
   amount: -42.5,
