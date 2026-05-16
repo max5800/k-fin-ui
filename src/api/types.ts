@@ -45,6 +45,11 @@ export type Transaction = {
   valuation_date: string;
   amount: number;
   currency: string;
+  // FX leg (M16-P2c) — original foreign-currency amount/currency of a
+  // non-EUR Santander credit-card purchase. Both null for EUR transactions
+  // and for every Comdirect/PayPal row.
+  original_amount: number | null;
+  original_currency: string | null;
   sender: string | null;
   recipient: string | null;
   description: string | null;

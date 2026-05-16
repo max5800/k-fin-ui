@@ -43,6 +43,8 @@ const sampleTx: Transaction = {
   valuation_date: '2026-04-10',
   amount: -42.5,
   currency: 'EUR',
+  original_amount: null,
+  original_currency: null,
   sender: 'John Doe',
   recipient: 'REWE',
   description: 'Einkauf',
@@ -218,11 +220,27 @@ describe('Transactions — source filter chips', () => {
     vi.clearAllMocks();
   });
 
-  it('renders the Alle | Bank | PayPal chips', () => {
+  it('renders the Alle | Bank | PayPal | Santander-CC chips', () => {
     renderTransactions(['/transactions']);
     expect(screen.getByRole('button', { name: 'Alle' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Bank' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'PayPal' })).toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: 'Santander-CC' }),
+    ).toBeInTheDocument();
+  });
+
+  it('threads the santander_cc source when the Santander-CC chip is clicked', async () => {
+    const user = userEvent.setup();
+    renderTransactions(['/transactions']);
+
+    await user.click(screen.getByRole('button', { name: 'Santander-CC' }));
+
+    await waitFor(() => {
+      expect(useTransactions).toHaveBeenLastCalledWith(
+        expect.objectContaining({ source: 'santander_cc' }),
+      );
+    });
   });
 
   it('defaults to no source filter (the "Alle" chip)', () => {
