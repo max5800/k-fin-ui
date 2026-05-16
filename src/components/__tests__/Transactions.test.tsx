@@ -195,3 +195,60 @@ describe('Transactions — server-side tag filter', () => {
     );
   });
 });
+
+describe('Transactions — source filter chips', () => {
+  beforeEach(() => {
+    vi.mocked(useTransactions).mockReturnValue({
+      data: { items: [sampleTx], total: 1, limit: 25, offset: 0 },
+      isPending: false,
+    } as unknown as ReturnType<typeof useTransactions>);
+    vi.mocked(useUpdateTransaction).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdateTransaction>);
+    vi.mocked(useCategories).mockReturnValue({
+      data: [],
+    } as unknown as ReturnType<typeof useCategories>);
+    vi.mocked(useTags).mockReturnValue({
+      data: [],
+    } as unknown as ReturnType<typeof useTags>);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('renders the Alle | Bank | PayPal chips', () => {
+    renderTransactions(['/transactions']);
+    expect(screen.getByRole('button', { name: 'Alle' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Bank' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'PayPal' })).toBeInTheDocument();
+  });
+
+  it('defaults to no source filter (the "Alle" chip)', () => {
+    renderTransactions(['/transactions']);
+    expect(useTransactions).toHaveBeenCalledWith(
+      expect.objectContaining({ source: undefined }),
+    );
+  });
+
+  it('threads the chosen source to useTransactions when a chip is clicked', async () => {
+    const user = userEvent.setup();
+    renderTransactions(['/transactions']);
+
+    await user.click(screen.getByRole('button', { name: 'PayPal' }));
+
+    await waitFor(() => {
+      expect(useTransactions).toHaveBeenLastCalledWith(
+        expect.objectContaining({ source: 'paypal' }),
+      );
+    });
+  });
+
+  it('reads an existing ?source filter from the URL', () => {
+    renderTransactions(['/transactions?source=comdirect']);
+    expect(useTransactions).toHaveBeenCalledWith(
+      expect.objectContaining({ source: 'comdirect' }),
+    );
+  });
+});

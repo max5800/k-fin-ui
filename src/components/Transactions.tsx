@@ -42,6 +42,14 @@ function parseFlag(v: string | null): FlagQuery {
   return v === 'true' || v === 'false' ? v : undefined;
 }
 
+type SourceFilter = 'comdirect' | 'paypal' | undefined;
+// Source-Filter-Chips: Label ↔ ?source-Wert. `undefined` ⇒ Param entfernt.
+const SOURCE_CHIPS: { label: string; value: SourceFilter }[] = [
+  { label: 'Alle', value: undefined },
+  { label: 'Bank', value: 'comdirect' },
+  { label: 'PayPal', value: 'paypal' },
+];
+
 // Fallback when /settings hasn't loaded yet — matches PAGE_SIZE_DEFAULT in
 // src/api/routers/settings.py so the very-first paint stays consistent
 // with the eventual server value.
@@ -69,6 +77,11 @@ export default function Transactions() {
   const [searchDraft, setSearchDraft] = useState(q);
   const isRefundFilter = parseFlag(searchParams.get('is_refund'));
   const internalTransferFilter = parseFlag(searchParams.get('internal_transfer'));
+  // Datenquellen-Filter: ?source=comdirect|paypal — fehlt der Param,
+  // zeigt die Tabelle den konsolidierten Single-Stream über alle Quellen.
+  const sourceParam = searchParams.get('source');
+  const sourceFilter: SourceFilter =
+    sourceParam === 'comdirect' || sourceParam === 'paypal' ? sourceParam : undefined;
   // Multi-Tag-Filter: ?tag_ids=a,b,c — kommt als CSV in der URL, wird ans
   // Backend als wiederholter Query-Param weitergereicht
   // (?tag_ids=a&tag_ids=b, OR-Semantik). Server-seitig gefiltert seit
@@ -88,6 +101,7 @@ export default function Transactions() {
     search: q || undefined,
     is_refund: isRefundFilter,
     internal_transfer: internalTransferFilter,
+    source: sourceFilter,
   });
   const { data: categories } = useCategories();
   const { data: tags } = useTags();
@@ -271,6 +285,31 @@ export default function Transactions() {
               <option value="false">Ohne Umbuchungen</option>
             </select>
             <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            Quelle
+          </label>
+          <div className="flex items-center gap-1 bg-surface-container-low p-1 rounded-lg">
+            {SOURCE_CHIPS.map((chip) => {
+              const active = sourceFilter === chip.value;
+              return (
+                <button
+                  key={chip.label}
+                  type="button"
+                  onClick={() => updateParam('source', chip.value ?? null)}
+                  className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${
+                    active
+                      ? 'bg-primary text-on-primary'
+                      : 'text-on-surface-variant hover:text-on-surface'
+                  }`}
+                >
+                  {chip.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 

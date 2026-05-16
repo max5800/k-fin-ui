@@ -1,6 +1,44 @@
+import { RefreshCw } from 'lucide-react';
+import { useLastSync } from '../api/sync';
+import { formatRelativeDate } from '../lib/format';
+
 interface TopBarProps {
   title?: string;
   subtitle?: string;
+}
+
+// Human-readable provider labels for the per-source last-sync indicator.
+const SOURCE_LABELS: Record<string, string> = {
+  comdirect: 'Comdirect',
+  paypal: 'PayPal',
+};
+
+function sourceLabel(source: string): string {
+  return SOURCE_LABELS[source] ?? source;
+}
+
+function LastSyncIndicator() {
+  const { data } = useLastSync();
+  if (!data || data.length === 0) return null;
+
+  return (
+    <div className="hidden md:flex items-center gap-2 text-xs text-on-surface-variant font-medium">
+      <RefreshCw className="w-3.5 h-3.5 opacity-60" />
+      <span className="flex items-center gap-2">
+        {data.map((entry, i) => (
+          <span key={entry.data_source} className="flex items-center gap-2">
+            {i > 0 && <span className="opacity-30">•</span>}
+            <span>
+              {sourceLabel(entry.data_source)}{' '}
+              <span className="opacity-60">
+                {formatRelativeDate(entry.finished_at ?? entry.started_at)}
+              </span>
+            </span>
+          </span>
+        ))}
+      </span>
+    </div>
+  );
 }
 
 export default function TopBar({ title, subtitle }: TopBarProps) {
@@ -20,11 +58,14 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
           </p>
         )}
       </div>
-      {displayName && (
-        <span className="text-xs text-on-surface-variant font-medium">
-          Hi, {displayName}
-        </span>
-      )}
+      <div className="flex items-center gap-6">
+        <LastSyncIndicator />
+        {displayName && (
+          <span className="text-xs text-on-surface-variant font-medium">
+            Hi, {displayName}
+          </span>
+        )}
+      </div>
     </header>
   );
 }

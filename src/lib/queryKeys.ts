@@ -14,6 +14,8 @@ export type TxFilters = {
   // through URLSearchParams without losing 'undefined' as 'all'.
   is_refund?: 'true' | 'false';
   internal_transfer?: 'true' | 'false';
+  // Upstream data source. Undefined ⇒ all sources (the "Alle" chip).
+  source?: 'comdirect' | 'paypal';
 };
 
 export type RunFilters = {
