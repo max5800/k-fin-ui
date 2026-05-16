@@ -42,12 +42,13 @@ function parseFlag(v: string | null): FlagQuery {
   return v === 'true' || v === 'false' ? v : undefined;
 }
 
-type SourceFilter = 'comdirect' | 'paypal' | undefined;
+type SourceFilter = 'comdirect' | 'paypal' | 'santander_cc' | undefined;
 // Source-Filter-Chips: Label ↔ ?source-Wert. `undefined` ⇒ Param entfernt.
 const SOURCE_CHIPS: { label: string; value: SourceFilter }[] = [
   { label: 'Alle', value: undefined },
   { label: 'Bank', value: 'comdirect' },
   { label: 'PayPal', value: 'paypal' },
+  { label: 'Santander-CC', value: 'santander_cc' },
 ];
 
 // Fallback when /settings hasn't loaded yet — matches PAGE_SIZE_DEFAULT in
@@ -77,11 +78,15 @@ export default function Transactions() {
   const [searchDraft, setSearchDraft] = useState(q);
   const isRefundFilter = parseFlag(searchParams.get('is_refund'));
   const internalTransferFilter = parseFlag(searchParams.get('internal_transfer'));
-  // Datenquellen-Filter: ?source=comdirect|paypal — fehlt der Param,
-  // zeigt die Tabelle den konsolidierten Single-Stream über alle Quellen.
+  // Datenquellen-Filter: ?source=comdirect|paypal|santander_cc — fehlt der
+  // Param, zeigt die Tabelle den konsolidierten Single-Stream über alle Quellen.
   const sourceParam = searchParams.get('source');
   const sourceFilter: SourceFilter =
-    sourceParam === 'comdirect' || sourceParam === 'paypal' ? sourceParam : undefined;
+    sourceParam === 'comdirect' ||
+    sourceParam === 'paypal' ||
+    sourceParam === 'santander_cc'
+      ? sourceParam
+      : undefined;
   // Multi-Tag-Filter: ?tag_ids=a,b,c — kommt als CSV in der URL, wird ans
   // Backend als wiederholter Query-Param weitergereicht
   // (?tag_ids=a&tag_ids=b, OR-Semantik). Server-seitig gefiltert seit
@@ -540,6 +545,21 @@ export default function Transactions() {
                   {selectedTx.amount > 0 ? '+' : ''}
                   {formatCurrency(selectedTx.amount)}
                 </p>
+                {selectedTx.original_currency &&
+                  selectedTx.original_amount != null &&
+                  selectedTx.original_currency !== 'EUR' && (
+                    <p className="text-xs text-on-surface-variant tabular-nums mt-1">
+                      {formatCurrency(
+                        selectedTx.original_amount,
+                        selectedTx.original_currency,
+                      )}
+                      {' · Kurs '}
+                      {(
+                        Math.abs(selectedTx.amount) /
+                        Math.abs(selectedTx.original_amount)
+                      ).toFixed(4)}
+                    </p>
+                  )}
                 <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-widest mt-2">
                   {formatDate(selectedTx.booking_date, 'dd.MM.yyyy')}
                 </p>

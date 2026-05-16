@@ -55,6 +55,8 @@ function makeTx(partial: Partial<Transaction> & Pick<Transaction, 'id'>): Transa
     valuation_date: '2026-05-01',
     amount: -12.34,
     currency: 'EUR',
+    original_amount: null,
+    original_currency: null,
     sender: null,
     recipient: null,
     description: null,

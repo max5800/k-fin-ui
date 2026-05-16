@@ -15,7 +15,7 @@ export type TxFilters = {
   is_refund?: 'true' | 'false';
   internal_transfer?: 'true' | 'false';
   // Upstream data source. Undefined ⇒ all sources (the "Alle" chip).
-  source?: 'comdirect' | 'paypal';
+  source?: 'comdirect' | 'paypal' | 'santander_cc';
 };
 
 export type RunFilters = {
