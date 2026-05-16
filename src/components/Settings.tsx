@@ -4,9 +4,15 @@ import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { isAxiosError } from 'axios';
 import { motion, AnimatePresence } from 'motion/react';
-import { useStartSync, useNormalizeSync, useConfirmSync } from '../api/sync';
+import {
+  useStartSync,
+  useNormalizeSync,
+  useConfirmSync,
+  type SyncProviderInfo,
+} from '../api/sync';
 import { useSettings, useTestWebhook, useUpdateSettings } from '../api/settings';
 import { useChangePassword } from '../api/auth';
+import { tanModalSubtitle, tanModalInstruction } from '../lib/tanInstructions';
 import BackfillSection from './BackfillSection';
 import RulesSection from './RulesSection';
 import SyncRunsHistory from './SyncRunsHistory';
@@ -65,6 +71,7 @@ export default function Settings() {
   }, [settingsQuery.data]);
 
   const [pendingSessionId, setPendingSessionId] = useState<string | null>(null);
+  const [syncProvider, setSyncProvider] = useState<SyncProviderInfo | null>(null);
   const [tanError, setTanError] = useState<string | null>(null);
   const [lastResult, setLastResult] = useState<string | null>(null);
 
@@ -74,6 +81,7 @@ export default function Settings() {
     try {
       const res = await startSync.mutateAsync();
       setPendingSessionId(res.session_id);
+      setSyncProvider(res.provider ?? null);
     } catch (err) {
       setTanError(extractError(err, 'Sync konnte nicht gestartet werden'));
     }
@@ -85,6 +93,7 @@ export default function Settings() {
     try {
       const res = await confirmSync.mutateAsync(pendingSessionId);
       setPendingSessionId(null);
+      setSyncProvider(null);
       const ingested = res.ingest?.inserted ?? 0;
       const normalized = res.ingest?.normalized ?? 0;
       setLastResult(
@@ -98,6 +107,7 @@ export default function Settings() {
 
   const handleCancel = () => {
     setPendingSessionId(null);
+    setSyncProvider(null);
     setTanError(null);
   };
 
@@ -588,7 +598,11 @@ export default function Settings() {
                   </div>
                   <div>
                     <h3 className="font-headline font-bold text-on-surface">Push-TAN bestätigen</h3>
-                    <p className="text-xs text-on-surface-variant">Comdirect photoTAN App</p>
+                    <p className="text-xs text-on-surface-variant">
+                      {syncProvider
+                        ? tanModalSubtitle(syncProvider)
+                        : 'Comdirect photoTAN App'}
+                    </p>
                   </div>
                 </div>
                 <button
@@ -602,11 +616,13 @@ export default function Settings() {
               </div>
 
               <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
-                Öffne die Comdirect <span className="font-bold text-on-surface">photoTAN App</span> auf
-                deinem Smartphone und bestätige die Anmeldung. Klicke danach unten
-                auf &laquo;Bestätigt&raquo; — Comdirect-Daten werden geladen und
-                normalisiert (~10–20 s). KI-Kategorisierung startest du danach
-                separat unter «Agents».
+                {syncProvider
+                  ? tanModalInstruction(syncProvider)
+                  : 'Öffne die Comdirect photoTAN App auf deinem Smartphone und ' +
+                    'bestätige die Anmeldung. Klicke danach unten auf ' +
+                    '«Bestätigt» — Comdirect-Daten werden geladen und ' +
+                    'normalisiert (~10–20 s). KI-Kategorisierung startest du ' +
+                    'danach separat unter «Agents».'}
               </p>
 
               {tanError && (
