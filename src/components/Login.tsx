@@ -108,9 +108,6 @@ export default function Login() {
             )}
           </div>
 
-          <div className="flex items-center justify-end text-xs">
-          </div>
-
           {authError && (
             <p className="text-xs text-error font-bold text-center" role="alert">
               {authError}

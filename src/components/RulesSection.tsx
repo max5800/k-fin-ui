@@ -30,6 +30,7 @@ import {
   type RulesApplyResult,
 } from '../api/categories';
 import { useTransactions } from '../api/transactions';
+import { useEscapeKey } from '../lib/useEscapeKey';
 import type { CategoryRule, Transaction } from '../api/types';
 
 /**
@@ -195,6 +196,15 @@ export default function RulesSection() {
     confirmDeleteId != null
       ? sortedRules.find((r) => r.id === confirmDeleteId) ?? null
       : null;
+
+  // Escape schließt die Bestätigungs-Modals — jeweils gesperrt, solange die
+  // zugehörige Mutation läuft.
+  useEscapeKey(!!rulePendingDelete && !deleteRule.isPending, () =>
+    setConfirmDeleteId(null),
+  );
+  useEscapeKey(confirmApplyAll && !applyAll.isPending, () =>
+    setConfirmApplyAll(false),
+  );
 
   const isSaving = createRule.isPending || updateRule.isPending;
 
@@ -366,6 +376,9 @@ export default function RulesSection() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96 }}
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="rule-delete-title"
               className="w-full max-w-md bg-surface-container-low border border-white/5 rounded-3xl p-8 shadow-2xl"
             >
               <div className="flex items-start justify-between mb-6">
@@ -374,7 +387,7 @@ export default function RulesSection() {
                     <Trash2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-headline font-bold text-on-surface">
+                    <h3 id="rule-delete-title" className="font-headline font-bold text-on-surface">
                       Regel löschen?
                     </h3>
                     <p className="text-xs text-on-surface-variant">
@@ -445,6 +458,9 @@ export default function RulesSection() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96 }}
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="rule-applyall-title"
               className="w-full max-w-md bg-surface-container-low border border-white/5 rounded-3xl p-8 shadow-2xl"
             >
               <div className="flex items-start justify-between mb-6">
@@ -453,7 +469,7 @@ export default function RulesSection() {
                     <Wand2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-headline font-bold text-on-surface">
+                    <h3 id="rule-applyall-title" className="font-headline font-bold text-on-surface">
                       Regeln auf bestehende Transaktionen anwenden?
                     </h3>
                     <p className="text-xs text-on-surface-variant">

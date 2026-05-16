@@ -694,11 +694,11 @@ function PnlCard({ stats, currency, isPending, txCount }: PnlCardProps) {
       {uncertain && !isPending && (
         <div
           role="alert"
-          className="mb-4 flex gap-3 p-3 rounded-xl bg-amber-400/10 border border-amber-400/30"
+          className="mb-4 flex gap-3 p-3 rounded-xl bg-warning/10 border border-warning/30"
         >
-          <AlertTriangle className="w-4 h-4 text-amber-300 shrink-0 mt-0.5" />
+          <AlertTriangle className="w-4 h-4 text-warning shrink-0 mt-0.5" />
           <div className="text-xs">
-            <p className="font-bold text-amber-300 mb-1">
+            <p className="font-bold text-warning mb-1">
               Lückenhafte Buchungshistorie — P&amp;L-Schätzung kann falsch sein
             </p>
             <p className="text-on-surface-variant">

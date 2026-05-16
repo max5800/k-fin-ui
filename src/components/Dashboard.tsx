@@ -160,7 +160,7 @@ export default function Dashboard() {
   ];
 
   return (
-    <div className="pt-28 px-8 pb-12 overflow-y-auto h-full space-y-8">
+    <div className="pt-28 px-8 pb-12 overflow-y-auto h-screen space-y-8">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-headline font-extrabold text-on-surface">
@@ -236,9 +236,9 @@ export default function Dashboard() {
               {isSummaryPending ? (
                 <div className="h-9 w-32 bg-white/5 animate-pulse rounded-lg" />
               ) : (
-                <h2 className="text-3xl font-headline font-extrabold text-on-surface tabular-nums">
+                <p className="text-3xl font-headline font-extrabold text-on-surface tabular-nums">
                   {kpi.value}
-                </h2>
+                </p>
               )}
               <p className="text-xs mt-2 text-on-surface-variant font-medium">{kpi.hint}</p>
             </motion.div>

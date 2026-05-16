@@ -45,7 +45,7 @@ const SEVERITY_STYLES: Record<string, { badge: string; icon: typeof Info }> = {
     icon: AlertTriangle,
   },
   warning: {
-    badge: 'bg-amber-400/10 text-amber-300 border-amber-400/30',
+    badge: 'bg-warning/10 text-warning border-warning/30',
     icon: AlertTriangle,
   },
   info: {
@@ -337,7 +337,7 @@ export default function Reports() {
   const activeReport = reports.find((r) => r.id === selectedReportId) || reports[0];
 
   return (
-    <div className="pt-20 h-[calc(100vh-0rem)] flex flex-col md:flex-row bg-surface">
+    <div className="pt-28 h-screen flex flex-col md:flex-row bg-background">
       <section className="w-full md:w-[380px] bg-surface-container-low border-r border-white/5 overflow-y-auto">
         <div className="p-6 sticky top-0 bg-surface-container-low/90 backdrop-blur-md z-10 border-b border-white/5">
           <h3 className="font-headline font-bold text-on-surface">Alle Reports</h3>
@@ -403,7 +403,7 @@ export default function Reports() {
         </div>
       </section>
 
-      <section className="flex-1 overflow-y-auto bg-surface p-8 lg:p-12">
+      <section className="flex-1 overflow-y-auto bg-background p-8 lg:p-12">
         <div className="max-w-3xl mx-auto">
           {activeReport ? (
             <motion.div

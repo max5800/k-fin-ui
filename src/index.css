@@ -35,6 +35,16 @@
   --color-error: #ffb4ab;
   --color-error-container: #93000a;
 
+  /* Positive/erfolgreich — z.B. abgeschlossene Review-Entscheidungen.
+     Heller Pastellton im Register von --color-error, für Text auf
+     den dunklen Surfaces. */
+  --color-success: #7fdba0;
+
+  /* Warnung — „knapp am Limit", Erstattungs-Badges, Severity „warning".
+     Wert = Tailwind amber-400, damit die Migration der bisherigen
+     amber-400-Nutzungen pixelgleich bleibt. */
+  --color-warning: #fbbf24;
+
   --color-outline: #869396;
   --color-outline-variant: #3c494c;
 }
@@ -47,6 +57,16 @@
   h1, h2, h3, h4, h5, h6 {
     @apply font-headline;
   }
+}
+
+/* Globaler, sichtbarer Fokus-Indikator für die Tastatur-Navigation.
+   Bewusst *außerhalb* aller @layer — unlayered CSS gewinnt gegen
+   Tailwinds (gelayerte) Utilities, also auch gegen `outline-none`, das
+   an mehreren Stellen ohne Ersatz gesetzt ist. `:focus-visible` greift
+   nur bei Tastatur-Fokus, Maus-Klicks lösen den Ring nicht aus. */
+:where(a, button, input, select, textarea, summary, [tabindex]):not([tabindex='-1']):focus-visible {
+  outline: 2px solid var(--color-primary);
+  outline-offset: 2px;
 }
 
 .chart-gradient {

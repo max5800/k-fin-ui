@@ -8,6 +8,7 @@ import {
   useBackfillRun,
   type BackfillRunResponse,
 } from '../api/sync';
+import { useEscapeKey } from '../lib/useEscapeKey';
 
 const MONTH_OPTIONS = [3, 6, 12, 18, 24] as const;
 
@@ -108,6 +109,11 @@ export default function BackfillSection() {
   const run = runQuery.data;
   const isRunning = run?.status === 'running';
 
+  // Escape schließt die Modals — das TAN-Modal nur, solange keine
+  // Bestätigung läuft; das Progress-Modal jederzeit (der Job läuft weiter).
+  useEscapeKey(!!pendingSessionId && !isConfirming, handleCancelTan);
+  useEscapeKey(progressOpen && !!activeRunId, handleCloseProgress);
+
   return (
     <>
       <section className="bg-surface-container-low rounded-2xl border border-white/5 p-6">
@@ -193,6 +199,9 @@ export default function BackfillSection() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96 }}
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="backfill-tan-title"
               className="w-full max-w-md bg-surface-container-low border border-white/5 rounded-3xl p-8 shadow-2xl"
             >
               <div className="flex items-start justify-between mb-6">
@@ -201,7 +210,7 @@ export default function BackfillSection() {
                     <Smartphone className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-headline font-bold text-on-surface">Push-TAN bestätigen</h3>
+                    <h3 id="backfill-tan-title" className="font-headline font-bold text-on-surface">Push-TAN bestätigen</h3>
                     <p className="text-xs text-on-surface-variant">Backfill für {months} Monate</p>
                   </div>
                 </div>
@@ -272,6 +281,9 @@ export default function BackfillSection() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96 }}
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="backfill-progress-title"
               className="w-full max-w-md bg-surface-container-low border border-white/5 rounded-3xl p-8 shadow-2xl"
             >
               <div className="flex items-start justify-between mb-6">
@@ -294,7 +306,7 @@ export default function BackfillSection() {
                     )}
                   </div>
                   <div>
-                    <h3 className="font-headline font-bold text-on-surface">
+                    <h3 id="backfill-progress-title" className="font-headline font-bold text-on-surface">
                       {run?.status === 'succeeded'
                         ? 'Backfill abgeschlossen'
                         : run?.status === 'failed'
