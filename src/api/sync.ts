@@ -1,9 +1,20 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from './client';
 
+// Provider metadata the worker returns with a sync-start response — drives
+// the provider-neutral TAN modal (M16-P2a). For Comdirect: display_name
+// "Comdirect", tan_kind "decoupled_app_push", display_hint "photoTAN".
+export interface SyncProviderInfo {
+  source: string;
+  display_name: string;
+  tan_kind: string;
+  display_hint?: string | null;
+}
+
 export interface SyncStartResponse {
   status: string;
   session_id: string;
+  provider?: SyncProviderInfo;
 }
 
 export interface SyncConfirmResponse {
@@ -13,10 +24,16 @@ export interface SyncConfirmResponse {
   agents?: { run_id: string } | null;
 }
 
-export function useStartSync() {
+// Default data source. P2a ships a single provider; P2b/P2c add a
+// selector that threads a different `source` through here.
+const DEFAULT_SYNC_SOURCE = 'comdirect';
+
+export function useStartSync(source: string = DEFAULT_SYNC_SOURCE) {
   return useMutation({
     mutationFn: async () => {
-      const { data } = await apiClient.post<SyncStartResponse>('/sync/start');
+      const { data } = await apiClient.post<SyncStartResponse>(
+        `/sync/${source}/start`,
+      );
       return data;
     },
   });
@@ -30,11 +47,11 @@ export function useNormalizeSync() {
   });
 }
 
-export function useConfirmSync() {
+export function useConfirmSync(source: string = DEFAULT_SYNC_SOURCE) {
   return useMutation({
     mutationFn: async (session_id: string) => {
       const { data } = await apiClient.post<SyncConfirmResponse>(
-        '/sync/confirm',
+        `/sync/${source}/complete`,
         null,
         { params: { session_id } },
       );

@@ -16,6 +16,8 @@ import {
   SYNC_RUNS_POLL_IDLE_MS,
   type SyncRun,
   syncRunsRefetchInterval,
+  useConfirmSync,
+  useStartSync,
   useSyncRuns,
 } from '../sync';
 
@@ -57,6 +59,44 @@ describe('useSyncRuns', () => {
       params: { limit: 5 },
     });
     expect(result.current.data).toEqual([succeededRun]);
+  });
+});
+
+describe('useStartSync', () => {
+  it('POSTs the provider-neutral /sync/{source}/start route', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: {
+        status: 'pending_tan',
+        session_id: 'sess-1',
+        provider: {
+          source: 'comdirect',
+          display_name: 'Comdirect',
+          tan_kind: 'decoupled_app_push',
+          display_hint: 'photoTAN',
+        },
+      },
+    });
+
+    const { result } = renderHook(() => useStartSync(), { wrapper });
+    const res = await result.current.mutateAsync();
+
+    expect(apiClient.post).toHaveBeenCalledWith('/sync/comdirect/start');
+    expect(res.provider?.display_name).toBe('Comdirect');
+  });
+});
+
+describe('useConfirmSync', () => {
+  it('POSTs /sync/{source}/complete with the session_id param', async () => {
+    vi.mocked(apiClient.post).mockResolvedValue({
+      data: { status: 'done', message: 'ok', ingest: null },
+    });
+
+    const { result } = renderHook(() => useConfirmSync(), { wrapper });
+    await result.current.mutateAsync('sess-1');
+
+    expect(apiClient.post).toHaveBeenCalledWith('/sync/comdirect/complete', null, {
+      params: { session_id: 'sess-1' },
+    });
   });
 });
 
