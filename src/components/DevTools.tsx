@@ -86,7 +86,7 @@ export default function DevTools() {
   return (
     <div className="p-8 max-w-3xl mx-auto">
       <div className="flex items-center gap-3 mb-2">
-        <FlaskConical className="w-7 h-7 text-amber-400" />
+        <FlaskConical className="w-7 h-7 text-warning" />
         <h1 className="text-2xl font-headline font-bold">Dev Tools</h1>
       </div>
       <p className="text-sm text-on-surface-variant mb-8">

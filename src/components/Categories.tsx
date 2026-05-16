@@ -181,7 +181,7 @@ export default function Categories() {
     uncategorized > 0;
 
   return (
-    <div className="pt-28 px-8 pb-12 overflow-y-auto h-full">
+    <div className="pt-28 px-8 pb-12 overflow-y-auto h-screen">
       <div className="flex gap-6 h-full">
         <div className="flex-1 min-w-0 space-y-8">
           <div className="flex items-center justify-between">
@@ -639,7 +639,7 @@ function CategoryCard({ row, isSelected, onEdit }: CategoryCardProps) {
       </Link>
 
       {row.refunded && row.refunded > 0 ? (
-        <div className="mb-3 -mt-1 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-amber-400/10 border border-amber-400/30 text-[11px] font-bold text-amber-300 tabular-nums"
+        <div className="mb-3 -mt-1 inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-warning/10 border border-warning/30 text-[11px] font-bold text-warning tabular-nums"
              title={`Brutto ${formatCurrency(row.spentGross ?? row.spent + row.refunded)} ausgegeben, davon ${formatCurrency(row.refunded)} erstattet — Netto ${formatCurrency(row.spent)}.`}>
           ↻ {formatCurrency(row.refunded)} erstattet
           <span className="text-on-surface-variant/70 font-normal">

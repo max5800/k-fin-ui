@@ -1,4 +1,4 @@
-import { Bell, Cloud, KeyRound, Layers, List, LogOut, RefreshCw, Sliders, Smartphone, User, X } from 'lucide-react';
+import { Bell, ChevronDown, Cloud, KeyRound, Layers, List, LogOut, RefreshCw, Sliders, Smartphone, User, X } from 'lucide-react';
 import { useEffect, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
@@ -12,6 +12,7 @@ import {
 } from '../api/sync';
 import { useSettings, useTestWebhook, useUpdateSettings } from '../api/settings';
 import { useChangePassword } from '../api/auth';
+import { useEscapeKey } from '../lib/useEscapeKey';
 import { tanModalSubtitle, tanModalInstruction } from '../lib/tanInstructions';
 import BackfillSection from './BackfillSection';
 import RulesSection from './RulesSection';
@@ -196,8 +197,12 @@ export default function Settings() {
   const isConfirming = confirmSync.isPending;
   const isNormalizing = normalize.isPending;
 
+  // Escape schließt das TAN-Modal — gesperrt, solange die Bestätigung läuft
+  // (gleiches Verhalten wie der Klick auf das Overlay).
+  useEscapeKey(!!pendingSessionId && !isConfirming, handleCancel);
+
   return (
-    <div className="pt-24 px-8 pb-12 h-screen overflow-y-auto">
+    <div className="pt-28 px-8 pb-12 h-screen overflow-y-auto">
       <div className="max-w-3xl space-y-8">
         <header className="flex justify-between items-start">
           <div>
@@ -395,7 +400,7 @@ export default function Settings() {
             {webhookTestResult && (
               <p
                 className={`text-xs font-bold ${
-                  webhookTestResult.ok ? 'text-primary' : 'text-red-400'
+                  webhookTestResult.ok ? 'text-primary' : 'text-error'
                 }`}
                 role="status"
               >
@@ -478,9 +483,7 @@ export default function Settings() {
                   </option>
                 ))}
               </select>
-              <span className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-on-surface-variant">
-                ▾
-              </span>
+              <ChevronDown className="w-4 h-4 absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none opacity-50" />
             </div>
           </div>
         </section>
@@ -589,6 +592,9 @@ export default function Settings() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96 }}
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="tan-confirm-title"
               className="w-full max-w-md bg-surface-container-low border border-white/5 rounded-3xl p-8 shadow-2xl"
             >
               <div className="flex items-start justify-between mb-6">
@@ -597,7 +603,7 @@ export default function Settings() {
                     <Smartphone className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-headline font-bold text-on-surface">Push-TAN bestätigen</h3>
+                    <h3 id="tan-confirm-title" className="font-headline font-bold text-on-surface">Push-TAN bestätigen</h3>
                     <p className="text-xs text-on-surface-variant">
                       {syncProvider
                         ? tanModalSubtitle(syncProvider)

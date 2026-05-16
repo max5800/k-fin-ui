@@ -28,7 +28,6 @@ import type { Transaction } from '../api/types';
 
 const editSchema = z.object({
   category_id: z.string().min(1, 'Kategorie erforderlich'),
-  notes: z.string().optional(),
   is_refund: z.boolean().optional(),
   internal_transfer: z.boolean().optional(),
 });
@@ -64,6 +63,10 @@ export default function Transactions() {
   const page = Math.max(1, Number(searchParams.get('page')) || 1);
   const categoryId = searchParams.get('category_id') || undefined;
   const q = searchParams.get('q') || '';
+  // Suchfeld ist vom URL-State entkoppelt: der Draft lebt lokal, die URL
+  // (und damit Query-Key + History) wird erst nach kurzer Tipp-Pause
+  // geschrieben — siehe Debounce-Effekt unten.
+  const [searchDraft, setSearchDraft] = useState(q);
   const isRefundFilter = parseFlag(searchParams.get('is_refund'));
   const internalTransferFilter = parseFlag(searchParams.get('internal_transfer'));
   // Multi-Tag-Filter: ?tag_ids=a,b,c — kommt als CSV in der URL, wird ans
@@ -108,7 +111,6 @@ export default function Transactions() {
     setSelectedTx(tx);
     reset({
       category_id: tx.category?.id || '',
-      notes: '',
       is_refund: tx.is_refund,
       internal_transfer: tx.internal_transfer,
     });
@@ -142,6 +144,19 @@ export default function Transactions() {
       return prev;
     });
   };
+
+  // Externer Reset (z.B. Sprung über einen Kategorie-Link) → Feld nachziehen.
+  useEffect(() => {
+    setSearchDraft(q);
+  }, [q]);
+
+  // Debounce: erst 300 ms nach dem letzten Tastendruck in die URL schreiben.
+  // Verhindert einen Refetch + History-Eintrag pro Zeichen.
+  useEffect(() => {
+    if (searchDraft === q) return;
+    const handle = setTimeout(() => updateParam('q', searchDraft || null), 300);
+    return () => clearTimeout(handle);
+  }, [searchDraft, q]);
 
   const handleExportCsv = async () => {
     setExportError(null);
@@ -184,7 +199,7 @@ export default function Transactions() {
   };
 
   return (
-    <div className="pt-24 px-8 pb-12 flex flex-col h-screen overflow-hidden">
+    <div className="pt-28 px-8 pb-12 flex flex-col h-screen overflow-hidden">
       <div className="mb-6 flex flex-col md:flex-row md:items-end gap-4">
         <div className="flex flex-col gap-1.5">
           <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
@@ -195,8 +210,8 @@ export default function Transactions() {
             <input
               type="text"
               placeholder="Empfänger, Beschreibung..."
-              defaultValue={q}
-              onChange={(e) => updateParam('q', e.target.value || null)}
+              value={searchDraft}
+              onChange={(e) => setSearchDraft(e.target.value)}
               className="bg-transparent border-none outline-none w-64 placeholder:text-on-surface-variant/40"
             />
           </div>
@@ -335,7 +350,19 @@ export default function Transactions() {
                     <tr
                       key={tx.id}
                       onClick={() => handleEdit(tx)}
-                      className={`hover:bg-surface-container-high/40 transition-colors cursor-pointer ${
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleEdit(tx);
+                        }
+                      }}
+                      tabIndex={0}
+                      role="button"
+                      aria-label={`Transaktion bearbeiten: ${
+                        tx.recipient || tx.sender || tx.description || 'Unbekannt'
+                      }`}
+                      aria-pressed={selectedTx?.id === tx.id}
+                      className={`hover:bg-surface-container-high/40 transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary/40 focus:ring-inset ${
                         selectedTx?.id === tx.id ? 'bg-surface-container-high/60' : ''
                       }`}
                     >
@@ -379,7 +406,7 @@ export default function Transactions() {
                             {tx.category?.name || 'Unkategorisiert'}
                           </span>
                           {tx.is_refund ? (
-                            <span className="px-2 py-0.5 bg-amber-400/15 text-amber-300 text-[10px] font-bold uppercase tracking-wider rounded">
+                            <span className="px-2 py-0.5 bg-warning/15 text-warning text-[10px] font-bold uppercase tracking-wider rounded">
                               Erstattung
                             </span>
                           ) : null}
@@ -455,6 +482,7 @@ export default function Transactions() {
                 </h3>
                 <button
                   onClick={() => setSelectedTx(null)}
+                  aria-label="Schließen"
                   className="text-on-surface-variant hover:text-on-surface transition-colors"
                 >
                   <X className="w-5 h-5" />
@@ -515,7 +543,7 @@ export default function Transactions() {
                       title="Positive Buchung, die eine frühere Ausgabe storniert (Krankenkasse, Splitwise, Retoure)."
                       className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-bold border cursor-pointer transition-colors ${
                         isRefundActive
-                          ? 'bg-amber-400/20 text-amber-300 border-amber-400/40'
+                          ? 'bg-warning/20 text-warning border-warning/40'
                           : 'bg-surface-container-high text-on-surface-variant border-white/10 hover:border-white/30'
                       }`}
                     >
@@ -546,16 +574,6 @@ export default function Transactions() {
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <label className="text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
-                    Notiz
-                  </label>
-                  <textarea
-                    {...register('notes')}
-                    className="w-full bg-surface-container-lowest border border-white/5 rounded-lg py-2.5 px-4 text-sm text-on-surface focus:ring-2 focus:ring-primary outline-none resize-none h-20 placeholder:text-on-surface-variant/30"
-                    placeholder="Optional"
-                  />
-                </div>
               </form>
 
               <div className="pt-6 border-t border-white/5 space-y-2 mt-4">

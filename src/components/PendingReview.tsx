@@ -66,12 +66,12 @@ export default function PendingReview() {
   const refundCount = refunds.data?.total ?? 0;
 
   return (
-    <div className="pt-24 px-8 pb-12 overflow-y-auto h-screen">
+    <div className="pt-28 px-8 pb-12 overflow-y-auto h-screen">
       <div className="flex justify-between items-end mb-6">
         <div>
-          <h3 className="text-on-surface-variant text-xs uppercase tracking-[0.2em] font-bold mb-1">
+          <p className="text-on-surface-variant text-xs uppercase tracking-[0.2em] font-bold mb-1">
             Categorization
-          </h3>
+          </p>
           <h1 className="font-headline text-3xl font-extrabold tracking-tight">
             Review
           </h1>
@@ -266,8 +266,8 @@ function SuggestionCard({
             }
             className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border transition-colors ${
               refundOverride
-                ? 'bg-amber-400/20 text-amber-300 border-amber-400/40 hover:bg-amber-400/30'
-                : 'bg-surface-container-high text-on-surface-variant border-white/10 hover:border-amber-400/40 hover:text-amber-300/80'
+                ? 'bg-warning/20 text-warning border-warning/40 hover:bg-warning/30'
+                : 'bg-surface-container-high text-on-surface-variant border-white/10 hover:border-warning/40 hover:text-warning/80'
             }`}
           >
             <RotateCcw className="w-3 h-3" />
@@ -642,7 +642,7 @@ function RefundGroupBlock(props: {
       </header>
 
       {group.suggestedReason ? (
-        <div className="px-5 py-2 bg-amber-400/5 border-b border-amber-400/15 flex items-center gap-2 text-xs text-amber-300/90">
+        <div className="px-5 py-2 bg-warning/5 border-b border-warning/15 flex items-center gap-2 text-xs text-warning/90">
           <Info className="w-3.5 h-3.5 shrink-0" />
           {group.suggestedReason}
         </div>

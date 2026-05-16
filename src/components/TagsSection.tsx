@@ -3,6 +3,7 @@ import { isAxiosError } from 'axios';
 import { Hash, Plus, Trash2, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useTags, useCreateTag, useDeleteTag } from '../api/categories';
+import { useEscapeKey } from '../lib/useEscapeKey';
 import type { Tag } from '../api/types';
 
 /**
@@ -59,6 +60,12 @@ export default function TagsSection() {
     confirmDeleteId != null
       ? tags?.find((t) => t.id === confirmDeleteId) ?? null
       : null;
+
+  // Escape schließt das Lösch-Bestätigungs-Modal — gesperrt, solange der
+  // Löschvorgang läuft.
+  useEscapeKey(!!tagPendingDelete && !deleteTag.isPending, () =>
+    setConfirmDeleteId(null),
+  );
 
   return (
     <section className="bg-surface-container-low rounded-2xl border border-white/5 p-6">
@@ -157,6 +164,9 @@ export default function TagsSection() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96 }}
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="tag-delete-title"
               className="w-full max-w-md bg-surface-container-low border border-white/5 rounded-3xl p-8 shadow-2xl"
             >
               <div className="flex items-start justify-between mb-6">
@@ -165,7 +175,7 @@ export default function TagsSection() {
                     <Trash2 className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-headline font-bold text-on-surface">
+                    <h3 id="tag-delete-title" className="font-headline font-bold text-on-surface">
                       Tag löschen?
                     </h3>
                     <p className="text-xs text-on-surface-variant">

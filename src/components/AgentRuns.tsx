@@ -27,6 +27,7 @@ import {
 } from '../api/runs';
 import { useSettings } from '../api/settings';
 import { formatDate } from '../lib/format';
+import { useEscapeKey } from '../lib/useEscapeKey';
 import type { AgentName, Run, RunStatus } from '../api/types';
 
 type PendingTrigger =
@@ -222,13 +223,18 @@ export default function AgentRuns() {
     cancelRun(cancelTargetId, { onSettled: () => setCancelTargetId(null) });
   };
 
+  // Escape schließt die Modals — gesperrt, solange die jeweilige Aktion läuft
+  // (gleiches Verhalten wie der Klick auf das Overlay).
+  useEscapeKey(!!cancelTargetRun && !isCancelling, () => setCancelTargetId(null));
+  useEscapeKey(!!pending && !isAnyTriggering, () => setPending(null));
+
   return (
-    <div className="pt-24 px-8 pb-12 overflow-y-auto h-screen">
+    <div className="pt-28 px-8 pb-12 overflow-y-auto h-screen">
       <div className="flex justify-between items-end mb-8">
         <div>
-          <h3 className="text-on-surface-variant text-xs uppercase tracking-[0.2em] font-bold mb-1">
+          <p className="text-on-surface-variant text-xs uppercase tracking-[0.2em] font-bold mb-1">
             AI-Pipelines
-          </h3>
+          </p>
           <h1 className="font-headline text-3xl font-extrabold tracking-tight">Agents</h1>
         </div>
         {hasActiveRun && activeRun && (
@@ -430,6 +436,9 @@ export default function AgentRuns() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96 }}
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="cancel-run-title"
               className="w-full max-w-md bg-surface-container-low border border-white/5 rounded-3xl p-8 shadow-2xl"
             >
               <div className="flex items-start justify-between mb-6">
@@ -438,7 +447,7 @@ export default function AgentRuns() {
                     <Ban className="w-5 h-5" />
                   </div>
                   <div>
-                    <h3 className="font-headline font-bold text-on-surface">
+                    <h3 id="cancel-run-title" className="font-headline font-bold text-on-surface">
                       Run wirklich abbrechen?
                     </h3>
                     <p className="text-xs text-on-surface-variant">
@@ -499,6 +508,9 @@ export default function AgentRuns() {
               animate={{ opacity: 1, scale: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.96 }}
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="trigger-run-title"
               className="w-full max-w-md bg-surface-container-low border border-white/5 rounded-3xl p-8 shadow-2xl"
             >
               <div className="flex items-start justify-between mb-6">
@@ -511,7 +523,7 @@ export default function AgentRuns() {
                     )}
                   </div>
                   <div>
-                    <h3 className="font-headline font-bold text-on-surface">
+                    <h3 id="trigger-run-title" className="font-headline font-bold text-on-surface">
                       {pending.kind === 'full'
                         ? 'Full Pipeline starten?'
                         : `${pending.agent.name} starten?`}
@@ -820,7 +832,7 @@ function RunRow({
               )}
             </div>
             {status === 'running' && run.last_error && (
-              <div className="flex items-start gap-2 text-[11px] rounded-md border border-amber-400/30 bg-amber-400/10 text-amber-200 px-3 py-2">
+              <div className="flex items-start gap-2 text-[11px] rounded-md border border-warning/30 bg-warning/10 text-warning px-3 py-2">
                 <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
                 <p className="leading-relaxed">
                   Letzter Fehler: {run.last_error} — Versuche werden wiederholt

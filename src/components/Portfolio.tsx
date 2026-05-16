@@ -92,7 +92,7 @@ export default function Portfolio() {
   const totalPositive = (summary?.total_pnl_abs ?? 0) >= 0;
 
   return (
-    <div className="pt-28 px-8 pb-12 overflow-y-auto h-full space-y-8">
+    <div className="pt-28 px-8 pb-12 overflow-y-auto h-screen space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         <KpiCard
           label="Gesamtwert"
@@ -316,9 +316,9 @@ function KpiCard({ label, value, hint, icon: Icon, tone, pending }: KpiCardProps
       {pending ? (
         <div className="h-9 w-32 bg-white/5 animate-pulse rounded-lg" />
       ) : (
-        <h2 className={`text-3xl font-headline font-extrabold tabular-nums ${valueClass}`}>
+        <p className={`text-3xl font-headline font-extrabold tabular-nums ${valueClass}`}>
           {value}
-        </h2>
+        </p>
       )}
       <p className="text-xs mt-2 text-on-surface-variant font-medium">{hint}</p>
     </motion.div>
@@ -406,7 +406,7 @@ function PositionsTable({
                   </div>
                   <div>
                     <p className="font-medium text-on-surface">{p.instrument.name || p.instrument.isin}</p>
-                    <p className="text-xs text-on-surface-variant font-label">
+                    <p className="text-xs text-on-surface-variant">
                       {prettyInstrumentType(p.instrument.instrument_type)}
                     </p>
                   </div>
