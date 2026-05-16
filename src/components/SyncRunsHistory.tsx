@@ -92,6 +92,7 @@ function RunsTable({ runs }: { runs: SyncRun[] }) {
           <tr className="text-left text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
             <th className="px-6 pb-3">Status</th>
             <th className="px-3 pb-3">Typ</th>
+            <th className="px-3 pb-3">Quelle</th>
             <th className="px-3 pb-3">Gestartet</th>
             <th className="px-3 pb-3 text-right">Dauer</th>
             <th className="px-3 pb-3 text-right">Zeilen</th>
@@ -120,6 +121,13 @@ function RunRow({ run }: RunRowProps) {
         <StatusBadge status={run.status} />
       </td>
       <td className="px-3 py-3 text-xs text-on-surface-variant">{prettySource(run.source)}</td>
+      <td className="px-3 py-3 text-xs text-on-surface-variant">
+        {run.data_source ? (
+          prettyDataSource(run.data_source)
+        ) : (
+          <span className="text-on-surface-variant/40">—</span>
+        )}
+      </td>
       <td className="px-3 py-3 text-on-surface" title={formatDate(run.started_at, 'dd.MM.yyyy HH:mm:ss')}>
         {formatRelativeDate(run.started_at)}
       </td>
@@ -182,6 +190,17 @@ function prettySource(source: string): string {
       return 'Datenabgleich';
     case 'normalize':
       return 'Re-Normalisierung';
+    default:
+      return source;
+  }
+}
+
+function prettyDataSource(source: string): string {
+  switch (source) {
+    case 'comdirect':
+      return 'Comdirect';
+    case 'paypal':
+      return 'PayPal';
     default:
       return source;
   }

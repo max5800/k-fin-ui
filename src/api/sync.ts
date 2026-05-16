@@ -151,6 +151,9 @@ export type SyncRunSource = 'raw_import' | 'normalize';
 export interface SyncRun {
   id: string;
   source: SyncRunSource;
+  // Upstream provider the run ingested (comdirect | paypal). Null for
+  // normalization passes, which are source-agnostic.
+  data_source: string | null;
   status: SyncRunStatus;
   started_at: string;
   finished_at: string | null;
@@ -187,5 +190,31 @@ export function useSyncRuns(limit = 20) {
     // While a run is in-flight we poll aggressively (2s) so the "Läuft" badge
     // flips to terminal almost immediately; otherwise idle at 30s.
     refetchInterval: syncRunsRefetchInterval,
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Per-source last-sync — one entry per provider that has ever synced.
+// Drives the TopBar "Last sync" indicator (M16-P2b).
+// ---------------------------------------------------------------------------
+
+export interface LastSync {
+  data_source: string;
+  status: SyncRunStatus;
+  started_at: string;
+  finished_at: string | null;
+}
+
+export function useLastSync() {
+  return useQuery({
+    queryKey: ['sync-last'],
+    queryFn: async () => {
+      const { data } = await apiClient.get<LastSync[]>('/sync/last');
+      return data;
+    },
+    // Refresh every minute so the relative "vor X" label stays roughly
+    // current without the user reloading the page.
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 }

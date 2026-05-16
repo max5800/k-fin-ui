@@ -31,6 +31,7 @@ const baseTime = new Date('2026-05-05T20:00:00Z').toISOString();
 const succeededRun: SyncRun = {
   id: 'run-ok',
   source: 'raw_import',
+  data_source: 'comdirect',
   status: 'succeeded',
   started_at: baseTime,
   finished_at: new Date('2026-05-05T20:00:42Z').toISOString(),
@@ -41,6 +42,7 @@ const succeededRun: SyncRun = {
 const runningRun: SyncRun = {
   id: 'run-now',
   source: 'raw_import',
+  data_source: 'paypal',
   status: 'running',
   started_at: baseTime,
   finished_at: null,
