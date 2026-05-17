@@ -1,3 +1,22 @@
+# [1.17.0](https://github.com/max5800/k-fin-ui/compare/v1.16.1...v1.17.0) (2026-05-17)
+
+
+### Bug Fixes
+
+* address full-review findings on M16 multi-source UI ([52698d9](https://github.com/max5800/k-fin-ui/commit/52698d9fa46247b76845d54bb0f016430f1f2dbd))
+* **ui:** ux-review stufe 1–3 — a11y, konsistenz & tote tokens ([cf4764a](https://github.com/max5800/k-fin-ui/commit/cf4764afc03aa762e8a47bc787b1217cd95068b9))
+
+
+### Features
+
+* add CategoryDonut component for expense vs budget visualization ([0c3f462](https://github.com/max5800/k-fin-ui/commit/0c3f462335f1eab94b2a547c065b9e5d0e339c0f))
+* add PayPal CSV import UI (M16-P2b) ([1d70fb0](https://github.com/max5800/k-fin-ui/commit/1d70fb02659f1e59bfe0f1c848b6017862c99621))
+* add Santander PDF-statement import UI ([85e28f4](https://github.com/max5800/k-fin-ui/commit/85e28f4789109b67cf76badb7fcb112ff7b84bff))
+* own-account IBANs settings UI ([f738dd5](https://github.com/max5800/k-fin-ui/commit/f738dd5561667e9f29bb6f84b92fea3c542931ff))
+* provider-neutral TAN modal (M16-P2a) ([77e36c2](https://github.com/max5800/k-fin-ui/commit/77e36c2eb4f9f44036a871e90401337eb023e442))
+* surface PayPal data source in UI — filter chips, run-history, last-sync (M16-P2b) ([3920e58](https://github.com/max5800/k-fin-ui/commit/3920e5820205a3fa9361e7a3f8042d76fc4de93f))
+* surface Santander credit-card source in UI — filter chip + FX detail (M16-P2c) ([e8469ce](https://github.com/max5800/k-fin-ui/commit/e8469ce30f9357a634e4dfd4a4251cb661933162))
+
 ## [1.16.1](https://github.com/max5800/k-fin-ui/compare/v1.16.0...v1.16.1) (2026-05-10)
 
 
