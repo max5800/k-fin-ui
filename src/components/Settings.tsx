@@ -15,6 +15,7 @@ import { useChangePassword } from '../api/auth';
 import { useEscapeKey } from '../lib/useEscapeKey';
 import { tanModalSubtitle, tanModalInstruction } from '../lib/tanInstructions';
 import BackfillSection from './BackfillSection';
+import PaypalImportSection from './PaypalImportSection';
 import RulesSection from './RulesSection';
 import SyncRunsHistory from './SyncRunsHistory';
 import TagsSection from './TagsSection';
@@ -274,6 +275,8 @@ export default function Settings() {
         </section>
 
         <BackfillSection />
+
+        <PaypalImportSection />
 
         <SyncRunsHistory />
 
