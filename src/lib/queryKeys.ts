@@ -1,3 +1,5 @@
+import type { DataSource } from './dataSources';
+
 export type TxFilters = {
   from?: string;
   to?: string;
@@ -15,7 +17,7 @@ export type TxFilters = {
   is_refund?: 'true' | 'false';
   internal_transfer?: 'true' | 'false';
   // Upstream data source. Undefined ⇒ all sources (the "Alle" chip).
-  source?: 'comdirect' | 'paypal' | 'santander_cc';
+  source?: DataSource;
 };
 
 export type RunFilters = {
@@ -51,6 +53,9 @@ export const qk = {
     detail: (id: string) => ['reports', id] as const 
   },
   aggregates: {
+    // Invalidation root — covers monthly, cashflow, budget-spending and
+    // refund-audit, which are all keyed under the 'aggregates' prefix.
+    all: ['aggregates'] as const,
     monthly: (y: number, m: number) => ['aggregates', 'monthly', y, m] as const,
     cashflow: (months: number) => ['aggregates', 'cashflow', months] as const,
   },
@@ -59,6 +64,16 @@ export const qk = {
   },
   categorization: {
     pending: ['categorization', 'pending'] as const,
+  },
+  // Sync controls — run history table, per-source last-sync indicator and
+  // the historical-backfill run poller.
+  sync: {
+    runs: (limit?: number) =>
+      (limit === undefined
+        ? (['sync-runs'] as const)
+        : (['sync-runs', limit] as const)),
+    last: ['sync-last'] as const,
+    backfillRun: (id: string | null) => ['backfill-run', id] as const,
   },
   portfolio: {
     summary: ['portfolio', 'summary'] as const,

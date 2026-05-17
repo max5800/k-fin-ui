@@ -4,6 +4,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { type SyncRun, type SyncRunStatus, useSyncRuns } from '../api/sync';
 import { qk } from '../lib/queryKeys';
 import { formatDate, formatRelativeDate } from '../lib/format';
+import { dataSourceLabel } from '../lib/dataSources';
 
 // Query-key prefixes that point at data which gets stale once a sync run
 // transitions from 'running' → terminal. Listed centrally so we don't drift
@@ -123,7 +124,7 @@ function RunRow({ run }: RunRowProps) {
       <td className="px-3 py-3 text-xs text-on-surface-variant">{prettySource(run.source)}</td>
       <td className="px-3 py-3 text-xs text-on-surface-variant">
         {run.data_source ? (
-          prettyDataSource(run.data_source)
+          dataSourceLabel(run.data_source)
         ) : (
           <span className="text-on-surface-variant/40">—</span>
         )}
@@ -190,17 +191,6 @@ function prettySource(source: string): string {
       return 'Datenabgleich';
     case 'normalize':
       return 'Re-Normalisierung';
-    default:
-      return source;
-  }
-}
-
-function prettyDataSource(source: string): string {
-  switch (source) {
-    case 'comdirect':
-      return 'Comdirect';
-    case 'paypal':
-      return 'PayPal';
     default:
       return source;
   }

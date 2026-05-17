@@ -18,6 +18,12 @@ app.use(
   }),
 );
 
+// Lightweight liveness/readiness probe. Registered before the SPA
+// catch-all so it returns JSON instead of index.html.
+app.get('/healthz', (_req, res) => {
+  res.status(200).json({ status: 'ok' });
+});
+
 app.use(express.static(distDir, { index: false }));
 
 app.get('*', (_req, res) => {

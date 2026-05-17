@@ -34,4 +34,41 @@ describe('useImportPaypalCsv', () => {
     expect(body).toBeInstanceOf(FormData);
     expect((body as FormData).get('file')).toBeInstanceOf(File);
   });
+
+  it('invalidates only the import-affected key families, not the whole cache', async () => {
+    mockPost.mockResolvedValue({
+      data: { parsed: 1, inserted: 1, duplicates: 0, normalized: 1 },
+    });
+    const qc = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
+    const spy = vi.spyOn(qc, 'invalidateQueries');
+    function scopedWrapper({ children }: { children: ReactNode }) {
+      return <QueryClientProvider client={qc}>{children}</QueryClientProvider>;
+    }
+    const { result } = renderHook(() => useImportPaypalCsv(), {
+      wrapper: scopedWrapper,
+    });
+
+    await result.current.mutateAsync(
+      new File(['x'], 'kontoauszug.csv', { type: 'text/csv' }),
+    );
+
+    const invalidatedRoots = spy.mock.calls.map(
+      ([arg]) => (arg as { queryKey: unknown[] }).queryKey[0],
+    );
+    expect(invalidatedRoots).toEqual(
+      expect.arrayContaining([
+        'transactions',
+        'aggregates',
+        'categorization',
+        'sync-runs',
+        'sync-last',
+      ]),
+    );
+    // No bare invalidateQueries() that would nuke the whole cache.
+    expect(
+      spy.mock.calls.every(([arg]) => arg !== undefined),
+    ).toBe(true);
+  });
 });

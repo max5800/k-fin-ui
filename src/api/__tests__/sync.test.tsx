@@ -20,6 +20,7 @@ import {
   useStartSync,
   useSyncRuns,
 } from '../sync';
+import { qk } from '../../lib/queryKeys';
 
 function wrapper({ children }: { children: ReactNode }) {
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -61,6 +62,21 @@ describe('useSyncRuns', () => {
       params: { limit: 5 },
     });
     expect(result.current.data).toEqual([succeededRun]);
+  });
+});
+
+describe('qk.sync key factory', () => {
+  it('keys sync runs by limit and shares a limit-less invalidation root', () => {
+    expect(qk.sync.runs(5)).toEqual(['sync-runs', 5]);
+    // Bare root — used by SyncRunsHistory + imports.ts to invalidate every
+    // limit variant at once.
+    expect(qk.sync.runs()).toEqual(['sync-runs']);
+  });
+
+  it('exposes stable keys for last-sync and a backfill run', () => {
+    expect(qk.sync.last).toEqual(['sync-last']);
+    expect(qk.sync.backfillRun('run-1')).toEqual(['backfill-run', 'run-1']);
+    expect(qk.sync.backfillRun(null)).toEqual(['backfill-run', null]);
   });
 });
 

@@ -75,19 +75,55 @@ describe('OwnIbansSection', () => {
   });
 
   it('surfaces the backend error detail when the save fails', async () => {
+    // A shape-valid IBAN that the backend still rejects (e.g. failed
+    // checksum) — passes the client-side guard so the PUT actually fires.
     mockPutImpl = () =>
       Promise.reject({
         isAxiosError: true,
-        response: { data: { detail: "Not a valid IBAN: 'nonsense'" } },
+        response: { data: { detail: "Not a valid IBAN: 'DE00000000000000000099'" } },
       });
+    renderSection();
+
+    const textarea = await loadedTextarea();
+    fireEvent.change(textarea, { target: { value: 'DE00000000000000000099' } });
+    fireEvent.click(screen.getByRole('button', { name: /Speicher/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Not a valid IBAN',
+    );
+  });
+
+  it('rejects malformed IBANs client-side without POSTing', async () => {
+    let putCalled = false;
+    mockPutImpl = async () => {
+      putCalled = true;
+      return { data: SETTINGS };
+    };
     renderSection();
 
     const textarea = await loadedTextarea();
     fireEvent.change(textarea, { target: { value: 'nonsense' } });
     fireEvent.click(screen.getByRole('button', { name: /Speicher/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(
-      'Not a valid IBAN',
-    );
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('Keine gültige IBAN');
+    expect(alert).toHaveTextContent('NONSENSE');
+    expect(putCalled).toBe(false);
+  });
+
+  it('uppercases and strips spaces before validating', async () => {
+    mockPutImpl = async () => ({ data: SETTINGS });
+    renderSection();
+
+    const textarea = await loadedTextarea();
+    // Lowercase, printed in 4-char groups — must normalise to a clean IBAN.
+    fireEvent.change(textarea, {
+      target: { value: 'de00 0000 0000 0000 0000 00' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: /Speicher/i }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Gespeichert');
+    // No client-side error means the normalised IBAN passed the shape check.
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });

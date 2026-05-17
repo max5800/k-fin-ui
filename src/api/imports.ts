@@ -1,5 +1,18 @@
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
+import { qk } from '../lib/queryKeys';
+
+// A full import runs the normalization pass, so every server view that
+// reflects transaction data may have changed. Invalidate exactly those
+// key families — not the whole cache — so unrelated queries (settings,
+// portfolio, auth) keep their data.
+function invalidateAfterImport(queryClient: QueryClient): void {
+  queryClient.invalidateQueries({ queryKey: qk.transactions.all });
+  queryClient.invalidateQueries({ queryKey: qk.aggregates.all });
+  queryClient.invalidateQueries({ queryKey: qk.categorization.pending });
+  queryClient.invalidateQueries({ queryKey: qk.sync.runs() });
+  queryClient.invalidateQueries({ queryKey: qk.sync.last });
+}
 
 // Result of a PayPal "Kontoauszug" CSV import — mirrors PayPalImportResult
 // in the backend's src/api/routers/import_csv.py.
@@ -24,9 +37,7 @@ export function useImportPaypalCsv() {
       );
       return data;
     },
-    // The import runs a full normalization pass — every server view
-    // (transactions, aggregates, sync history …) may have changed.
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => invalidateAfterImport(queryClient),
   });
 }
 
@@ -56,7 +67,6 @@ export function useImportSantanderPdf() {
       );
       return data;
     },
-    // The import runs a full normalization pass — invalidate every view.
-    onSuccess: () => queryClient.invalidateQueries(),
+    onSuccess: () => invalidateAfterImport(queryClient),
   });
 }

@@ -35,6 +35,21 @@ function uploadCsv(container: HTMLElement) {
   fireEvent.change(input, { target: { files: [file] } });
 }
 
+// Build a File with a forced byte size — `File.size` is read-only, so we
+// patch the descriptor for the oversize-rejection test.
+function uploadFile(
+  container: HTMLElement,
+  opts: { name: string; type: string; size?: number },
+) {
+  const input = container.querySelector('input[type="file"]');
+  if (!input) throw new Error('file input not found');
+  const file = new File(['x'], opts.name, { type: opts.type });
+  if (opts.size !== undefined) {
+    Object.defineProperty(file, 'size', { value: opts.size });
+  }
+  fireEvent.change(input, { target: { files: [file] } });
+}
+
 describe('PaypalImportSection', () => {
   beforeEach(() => {
     mockPostImpl = async () => ({ data: {} });
@@ -75,5 +90,39 @@ describe('PaypalImportSection', () => {
     uploadCsv(container);
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Transaktionscode');
+  });
+
+  it('rejects an oversized file client-side without uploading', async () => {
+    let posted = false;
+    mockPostImpl = async () => {
+      posted = true;
+      return { data: {} };
+    };
+    const { container } = renderSection();
+
+    uploadFile(container, {
+      name: 'kontoauszug.csv',
+      type: 'text/csv',
+      size: 11 * 1024 * 1024, // over the 10 MB CSV cap
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('zu groß');
+    expect(posted).toBe(false);
+  });
+
+  it('rejects a wrong-type file client-side without uploading', async () => {
+    let posted = false;
+    mockPostImpl = async () => {
+      posted = true;
+      return { data: {} };
+    };
+    const { container } = renderSection();
+
+    uploadFile(container, { name: 'statement.pdf', type: 'application/pdf' });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'nicht unterstütztes Format',
+    );
+    expect(posted).toBe(false);
   });
 });
