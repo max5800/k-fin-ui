@@ -20,6 +20,7 @@ import {
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
+import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from 'recharts';
 import {
   useBudgets,
   useCategories,
@@ -241,6 +242,8 @@ export default function Categories() {
             />
           )}
 
+          <CategoryDonut rows={expenseRows} />
+
           <CreateCategoryForm existingCategories={categories ?? []} />
 
           <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -436,6 +439,215 @@ function SummaryStrip({
           />
         </div>
       </div>
+    </section>
+  );
+}
+
+// ── Donut: Ausgaben-Verteilung (Ist) vs. Budget-Aufteilung (Soll) ────
+//
+// Ein Donut mit Ist/Soll-Umschalter. "Ist" = tatsächlich ausgegeben pro
+// Kategorie (refund-aware, aus `BudgetRow.spent`), "Soll" = gesetztes
+// Monatslimit. Die Slice-Farbe wird einmal pro Kategorie-ID vergeben —
+// stabile Sortierung nach Größe, mode-unabhängig — und bleibt beim
+// Umschalten gleich, damit das Auge Plan gegen Realität spiegeln kann.
+// Slices jenseits der Top 7 werden zu „Sonstige" gebündelt, sonst wird
+// der Donut zu Konfetti.
+
+type DonutMode = 'ist' | 'soll';
+
+const DONUT_PALETTE = [
+  '#44d8f1', '#f5c451', '#9d8df1', '#5fd0a0',
+  '#ff9e6d', '#f17ba8', '#6db3f5', '#c0cf5f',
+];
+const DONUT_OTHER = '#5b6472';
+const DONUT_TOP_N = 7;
+
+type DonutSlice = { id: string; name: string; value: number; color: string };
+
+function donutValue(row: BudgetRow, mode: DonutMode): number {
+  return mode === 'ist' ? row.spent : row.budget?.monthly_limit ?? 0;
+}
+
+function buildDonutColorMap(rows: BudgetRow[]): Map<string, string> {
+  const ordered = [...rows].sort(
+    (a, b) =>
+      Math.max(b.spent, b.budget?.monthly_limit ?? 0) -
+      Math.max(a.spent, a.budget?.monthly_limit ?? 0),
+  );
+  const map = new Map<string, string>();
+  ordered.forEach((r, i) =>
+    map.set(r.id, DONUT_PALETTE[i % DONUT_PALETTE.length]),
+  );
+  return map;
+}
+
+function buildDonutSlices(
+  rows: BudgetRow[],
+  mode: DonutMode,
+  colorMap: Map<string, string>,
+): DonutSlice[] {
+  const valued = rows
+    .map((r) => ({
+      id: r.id,
+      name: r.name,
+      value: donutValue(r, mode),
+      color: colorMap.get(r.id) ?? DONUT_OTHER,
+    }))
+    .filter((s) => s.value > 0)
+    .sort((a, b) => b.value - a.value);
+  if (valued.length <= DONUT_TOP_N + 1) return valued;
+  const rest = valued.slice(DONUT_TOP_N);
+  return [
+    ...valued.slice(0, DONUT_TOP_N),
+    {
+      id: '__other__',
+      name: `Sonstige (${rest.length})`,
+      value: rest.reduce((s, x) => s + x.value, 0),
+      color: DONUT_OTHER,
+    },
+  ];
+}
+
+function DonutTooltip({
+  active,
+  payload,
+  total,
+}: {
+  active?: boolean;
+  payload?: { payload: DonutSlice }[];
+  total: number;
+}) {
+  if (!active || !payload?.length) return null;
+  const s = payload[0].payload;
+  const pct = total > 0 ? (s.value / total) * 100 : 0;
+  return (
+    <div className="bg-surface-container-highest border border-white/10 rounded-lg px-4 py-3 shadow-2xl text-xs">
+      <div className="flex items-center gap-2 mb-1">
+        <span
+          className="w-2.5 h-2.5 rounded-full"
+          style={{ backgroundColor: s.color }}
+        />
+        <span className="font-bold text-on-surface uppercase tracking-wider">
+          {s.name}
+        </span>
+      </div>
+      <div className="tabular-nums text-on-surface-variant">
+        <span className="text-on-surface font-bold">{formatCurrency(s.value)}</span>
+        {' · '}
+        {Math.round(pct)} % vom Gesamt
+      </div>
+    </div>
+  );
+}
+
+function CategoryDonut({ rows }: { rows: BudgetRow[] }) {
+  const [mode, setMode] = useState<DonutMode>('ist');
+  const colorMap = useMemo(() => buildDonutColorMap(rows), [rows]);
+  const slices = useMemo(
+    () => buildDonutSlices(rows, mode, colorMap),
+    [rows, mode, colorMap],
+  );
+  const total = slices.reduce((s, x) => s + x.value, 0);
+
+  return (
+    <section className="bg-surface-container rounded-2xl p-8 border border-white/5">
+      <div className="flex items-start justify-between gap-4 flex-wrap mb-6">
+        <div>
+          <h4 className="text-lg font-headline font-bold text-on-surface">
+            {mode === 'ist' ? 'Ausgaben-Verteilung' : 'Budget-Aufteilung'}
+          </h4>
+          <p className="text-xs text-on-surface-variant mt-0.5">
+            {mode === 'ist'
+              ? 'Wohin dein Geld diesen Monat geflossen ist'
+              : 'Wie dein geplantes Budget über Kategorien verteilt ist'}
+          </p>
+        </div>
+        <div
+          className="flex items-center gap-1 bg-surface-container-high rounded-lg p-1"
+          role="group"
+          aria-label="Datenquelle des Diagramms"
+        >
+          {(['ist', 'soll'] as const).map((m) => (
+            <button
+              key={m}
+              onClick={() => setMode(m)}
+              aria-pressed={mode === m}
+              className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
+                mode === m
+                  ? 'bg-primary text-on-primary'
+                  : 'text-on-surface-variant hover:text-on-surface'
+              }`}
+            >
+              {m === 'ist' ? 'Ist' : 'Soll'}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {slices.length === 0 ? (
+        <div className="text-center py-12 text-on-surface-variant text-sm border border-dashed border-white/10 rounded-2xl">
+          {mode === 'ist'
+            ? 'Keine Ausgaben in diesem Monat.'
+            : 'Noch keine Budgets gesetzt — leg in einer Kategorie ein Limit fest.'}
+        </div>
+      ) : (
+        <div className="flex flex-col lg:flex-row items-center gap-8">
+          <div className="relative w-56 h-56 shrink-0">
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={slices}
+                  dataKey="value"
+                  nameKey="name"
+                  innerRadius="62%"
+                  outerRadius="100%"
+                  paddingAngle={2}
+                  stroke="none"
+                  startAngle={90}
+                  endAngle={-270}
+                  isAnimationActive={false}
+                >
+                  {slices.map((s) => (
+                    <Cell key={s.id} fill={s.color} />
+                  ))}
+                </Pie>
+                <Tooltip content={<DonutTooltip total={total} />} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <span className="text-[10px] uppercase tracking-widest text-on-surface-variant font-bold">
+                {mode === 'ist' ? 'Gesamt' : 'Geplant'}
+              </span>
+              <span className="text-2xl font-headline font-extrabold text-on-surface tabular-nums">
+                {formatCurrency(total)}
+              </span>
+            </div>
+          </div>
+
+          <ul className="flex-1 min-w-0 w-full grid grid-cols-1 sm:grid-cols-2 gap-x-6 gap-y-2">
+            {slices.map((s) => {
+              const pct = total > 0 ? (s.value / total) * 100 : 0;
+              return (
+                <li key={s.id} className="flex items-center gap-2 text-sm">
+                  <span
+                    className="w-2.5 h-2.5 rounded-full shrink-0"
+                    style={{ backgroundColor: s.color }}
+                  />
+                  <span className="text-on-surface-variant truncate flex-1 min-w-0">
+                    {s.name}
+                  </span>
+                  <span className="text-on-surface font-bold tabular-nums">
+                    {formatCurrency(s.value)}
+                  </span>
+                  <span className="text-on-surface-variant text-xs tabular-nums w-11 text-right">
+                    {Math.round(pct)} %
+                  </span>
+                </li>
+              );
+            })}
+          </ul>
+        </div>
+      )}
     </section>
   );
 }
