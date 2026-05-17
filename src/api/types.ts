@@ -115,6 +115,10 @@ export type AppSettings = {
   // in Wave 1 Stream D — until then, PUT /settings will 422 on this key
   // and the UI degrades to read-only "demnächst" mode (see Settings.tsx).
   webhook_url?: string | null;
+  // The user's own-account IBANs — transfers between them are flagged as
+  // internal and kept out of income/expense. UI-editable; replaced the
+  // former OWN_IBANS env var (backend always returns the list, [] if unset).
+  own_ibans: string[];
 };
 
 export type PendingTransactionPreview = {

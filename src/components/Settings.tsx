@@ -16,6 +16,8 @@ import { useEscapeKey } from '../lib/useEscapeKey';
 import { tanModalSubtitle, tanModalInstruction } from '../lib/tanInstructions';
 import BackfillSection from './BackfillSection';
 import PaypalImportSection from './PaypalImportSection';
+import SantanderImportSection from './SantanderImportSection';
+import OwnIbansSection from './OwnIbansSection';
 import RulesSection from './RulesSection';
 import SyncRunsHistory from './SyncRunsHistory';
 import TagsSection from './TagsSection';
@@ -278,11 +280,15 @@ export default function Settings() {
 
         <PaypalImportSection />
 
+        <SantanderImportSection />
+
         <SyncRunsHistory />
 
         <TagsSection />
 
         <RulesSection />
+
+        <OwnIbansSection />
 
         <section className="bg-surface-container-low rounded-2xl border border-white/5 p-6">
           <div className="flex items-center gap-3 mb-6">
