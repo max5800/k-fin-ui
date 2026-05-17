@@ -11,7 +11,7 @@ import {
   X,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
-import { useMemo, useRef, useState, useEffect } from 'react';
+import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   downloadTransactionsCsv,
@@ -25,6 +25,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import type { Transaction } from '../api/types';
+import { DATA_SOURCE_LIST, type DataSource, isDataSource } from '../lib/dataSources';
 
 const editSchema = z.object({
   category_id: z.string().min(1, 'Kategorie erforderlich'),
@@ -42,13 +43,13 @@ function parseFlag(v: string | null): FlagQuery {
   return v === 'true' || v === 'false' ? v : undefined;
 }
 
-type SourceFilter = 'comdirect' | 'paypal' | 'santander_cc' | undefined;
+type SourceFilter = DataSource | undefined;
 // Source-Filter-Chips: Label ↔ ?source-Wert. `undefined` ⇒ Param entfernt.
+// Aus der zentralen DataSource-Registry abgeleitet (chipLabel), plus die
+// führende «Alle»-Chip, die den Param entfernt.
 const SOURCE_CHIPS: { label: string; value: SourceFilter }[] = [
   { label: 'Alle', value: undefined },
-  { label: 'Bank', value: 'comdirect' },
-  { label: 'PayPal', value: 'paypal' },
-  { label: 'Santander-CC', value: 'santander_cc' },
+  ...DATA_SOURCE_LIST.map((s) => ({ label: s.chipLabel, value: s.value })),
 ];
 
 // Fallback when /settings hasn't loaded yet — matches PAGE_SIZE_DEFAULT in
@@ -82,11 +83,7 @@ export default function Transactions() {
   // Param, zeigt die Tabelle den konsolidierten Single-Stream über alle Quellen.
   const sourceParam = searchParams.get('source');
   const sourceFilter: SourceFilter =
-    sourceParam === 'comdirect' ||
-    sourceParam === 'paypal' ||
-    sourceParam === 'santander_cc'
-      ? sourceParam
-      : undefined;
+    sourceParam !== null && isDataSource(sourceParam) ? sourceParam : undefined;
   // Multi-Tag-Filter: ?tag_ids=a,b,c — kommt als CSV in der URL, wird ans
   // Backend als wiederholter Query-Param weitergereicht
   // (?tag_ids=a&tag_ids=b, OR-Semantik). Server-seitig gefiltert seit
@@ -148,14 +145,17 @@ export default function Transactions() {
     );
   };
 
-  const updateParam = (key: string, value: string | null) => {
-    setSearchParams((prev) => {
-      if (value) prev.set(key, value);
-      else prev.delete(key);
-      prev.set('page', '1');
-      return prev;
-    });
-  };
+  const updateParam = useCallback(
+    (key: string, value: string | null) => {
+      setSearchParams((prev) => {
+        if (value) prev.set(key, value);
+        else prev.delete(key);
+        prev.set('page', '1');
+        return prev;
+      });
+    },
+    [setSearchParams],
+  );
 
   const goToPage = (p: number) => {
     setSearchParams((prev) => {
@@ -175,7 +175,7 @@ export default function Transactions() {
     if (searchDraft === q) return;
     const handle = setTimeout(() => updateParam('q', searchDraft || null), 300);
     return () => clearTimeout(handle);
-  }, [searchDraft, q]);
+  }, [searchDraft, q, updateParam]);
 
   const handleExportCsv = async () => {
     setExportError(null);
@@ -553,11 +553,16 @@ export default function Transactions() {
                         selectedTx.original_amount,
                         selectedTx.original_currency,
                       )}
-                      {' · Kurs '}
-                      {(
-                        Math.abs(selectedTx.amount) /
-                        Math.abs(selectedTx.original_amount)
-                      ).toFixed(4)}
+                      {selectedTx.original_amount !== 0 &&
+                        Math.abs(selectedTx.amount) > 0 && (
+                          <>
+                            {' · Kurs '}
+                            {(
+                              Math.abs(selectedTx.amount) /
+                              Math.abs(selectedTx.original_amount)
+                            ).toFixed(4)}
+                          </>
+                        )}
                     </p>
                   )}
                 <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-widest mt-2">

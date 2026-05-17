@@ -1,5 +1,7 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiClient } from './client';
+import { qk } from '../lib/queryKeys';
+import type { DataSource } from '../lib/dataSources';
 
 // Provider metadata the worker returns with a sync-start response — drives
 // the provider-neutral TAN modal (M16-P2a). For Comdirect: display_name
@@ -124,7 +126,7 @@ export function useConfirmBackfill() {
 
 export function useBackfillRun(run_id: string | null) {
   return useQuery({
-    queryKey: ['backfill-run', run_id],
+    queryKey: qk.sync.backfillRun(run_id),
     queryFn: async (): Promise<BackfillRunResponse> => {
       const { data } = await apiClient.get<BackfillRunResponse>(
         `/sync/backfill/runs/${run_id}`,
@@ -151,9 +153,9 @@ export type SyncRunSource = 'raw_import' | 'normalize';
 export interface SyncRun {
   id: string;
   source: SyncRunSource;
-  // Upstream provider the run ingested (comdirect | paypal). Null for
-  // normalization passes, which are source-agnostic.
-  data_source: string | null;
+  // Upstream provider the run ingested. Null for normalization passes,
+  // which are source-agnostic.
+  data_source: DataSource | null;
   status: SyncRunStatus;
   started_at: string;
   finished_at: string | null;
@@ -178,7 +180,7 @@ export function syncRunsRefetchInterval(
 
 export function useSyncRuns(limit = 20) {
   return useQuery({
-    queryKey: ['sync-runs', limit],
+    queryKey: qk.sync.runs(limit),
     queryFn: async () => {
       const { data } = await apiClient.get<SyncRun[]>('/sync/runs', {
         params: { limit },
@@ -199,7 +201,7 @@ export function useSyncRuns(limit = 20) {
 // ---------------------------------------------------------------------------
 
 export interface LastSync {
-  data_source: string;
+  data_source: DataSource;
   status: SyncRunStatus;
   started_at: string;
   finished_at: string | null;
@@ -207,7 +209,7 @@ export interface LastSync {
 
 export function useLastSync() {
   return useQuery({
-    queryKey: ['sync-last'],
+    queryKey: qk.sync.last,
     queryFn: async () => {
       const { data } = await apiClient.get<LastSync[]>('/sync/last');
       return data;

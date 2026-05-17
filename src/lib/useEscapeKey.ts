@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
  * Ruft `onEscape` auf, wenn die Escape-Taste gedrückt wird, solange
@@ -11,12 +11,17 @@ import { useEffect } from 'react';
  * mitten in einer Mutation wegklappt.
  */
 export function useEscapeKey(active: boolean, onEscape: () => void): void {
+  // `onEscape` in einem Ref halten, damit der keydown-Listener nicht bei
+  // jedem Render (neue Callback-Identität) ab- und wieder angemeldet wird.
+  const onEscapeRef = useRef(onEscape);
+  onEscapeRef.current = onEscape;
+
   useEffect(() => {
     if (!active) return;
     const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onEscape();
+      if (e.key === 'Escape') onEscapeRef.current();
     };
     document.addEventListener('keydown', handler);
     return () => document.removeEventListener('keydown', handler);
-  }, [active, onEscape]);
+  }, [active]);
 }

@@ -1,21 +1,20 @@
 import { Landmark, RefreshCw } from 'lucide-react';
 import { useEffect, useState } from 'react';
-import { isAxiosError } from 'axios';
 import { useSettings, useUpdateSettings } from '../api/settings';
+import { extractApiError } from '../lib/apiError';
 
-function extractError(err: unknown, fallback: string): string {
-  if (isAxiosError(err)) {
-    const detail = err.response?.data?.detail;
-    if (typeof detail === 'string') return detail;
-  }
-  return fallback;
-}
+// Coarse IBAN shape: two-letter country code, two check digits, then 10–30
+// alphanumerics. The backend stays the authority on checksum validity —
+// this only stops obvious garbage from being POSTed.
+const IBAN_SHAPE = /^[A-Z]{2}\d{2}[A-Z0-9]{10,30}$/;
 
-// Split the textarea (one IBAN per line, commas tolerated) into a clean list.
+// Split the textarea (one IBAN per line, commas tolerated) into a clean
+// list. Each entry is uppercased and stripped of internal spaces — banks
+// print IBANs in 4-char groups, users paste them verbatim.
 function parseIbans(text: string): string[] {
   return text
     .split(/[\n,]+/)
-    .map((entry) => entry.trim())
+    .map((entry) => entry.replace(/\s+/g, '').toUpperCase())
     .filter(Boolean);
 }
 
@@ -35,11 +34,20 @@ export default function OwnIbansSection() {
   const handleSave = async () => {
     setError(null);
     setSaved(false);
+    const ibans = parseIbans(draft);
+    const invalid = ibans.filter((iban) => !IBAN_SHAPE.test(iban));
+    if (invalid.length > 0) {
+      setError(
+        `Keine gültige IBAN: ${invalid.join(', ')}. ` +
+          'Format z. B. DE89… — Ländercode, zwei Prüfziffern, dann Konto.',
+      );
+      return;
+    }
     try {
-      await updateSettings.mutateAsync({ own_ibans: parseIbans(draft) });
+      await updateSettings.mutateAsync({ own_ibans: ibans });
       setSaved(true);
     } catch (err) {
-      setError(extractError(err, 'IBANs konnten nicht gespeichert werden'));
+      setError(extractApiError(err, 'IBANs konnten nicht gespeichert werden'));
     }
   };
 

@@ -1,20 +1,11 @@
 import { RefreshCw } from 'lucide-react';
 import { useLastSync } from '../api/sync';
 import { formatRelativeDate } from '../lib/format';
+import { dataSourceLabel } from '../lib/dataSources';
 
 interface TopBarProps {
   title?: string;
   subtitle?: string;
-}
-
-// Human-readable provider labels for the per-source last-sync indicator.
-const SOURCE_LABELS: Record<string, string> = {
-  comdirect: 'Comdirect',
-  paypal: 'PayPal',
-};
-
-function sourceLabel(source: string): string {
-  return SOURCE_LABELS[source] ?? source;
 }
 
 function LastSyncIndicator() {
@@ -29,7 +20,7 @@ function LastSyncIndicator() {
           <span key={entry.data_source} className="flex items-center gap-2">
             {i > 0 && <span className="opacity-30">•</span>}
             <span>
-              {sourceLabel(entry.data_source)}{' '}
+              {dataSourceLabel(entry.data_source)}{' '}
               <span className="opacity-60">
                 {formatRelativeDate(entry.finished_at ?? entry.started_at)}
               </span>

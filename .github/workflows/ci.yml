@@ -17,7 +17,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: "lts/*"
+          node-version: "20"
           cache: "npm"
 
       - name: Install dependencies
@@ -28,6 +28,12 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      # Non-blocking: surfaces production dependency advisories without
+      # gating merges. Promote to a hard gate once the baseline is clean.
+      - name: Dependency audit
+        continue-on-error: true
+        run: npm audit --omit=dev --audit-level=high
 
   docker-build:
     name: Docker Build

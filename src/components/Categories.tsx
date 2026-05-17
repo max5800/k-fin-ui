@@ -1,5 +1,4 @@
 import { useMemo, useState, type FormEvent } from 'react';
-import { isAxiosError } from 'axios';
 import { Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'motion/react';
 import {
@@ -29,6 +28,7 @@ import {
 } from '../api/categories';
 import { useBudgetSpending, useMonthlySummary } from '../api/aggregates';
 import { formatCurrency } from '../lib/format';
+import { extractApiError } from '../lib/apiError';
 import type { Budget, CategoryBreakdown } from '../api/types';
 import {
   classifyTier,
@@ -453,22 +453,27 @@ function SummaryStrip({
 // Slices jenseits der Top 7 werden zu „Sonstige" gebündelt, sonst wird
 // der Donut zu Konfetti.
 
-type DonutMode = 'ist' | 'soll';
+export type DonutMode = 'ist' | 'soll';
 
-const DONUT_PALETTE = [
+export const DONUT_PALETTE = [
   '#44d8f1', '#f5c451', '#9d8df1', '#5fd0a0',
   '#ff9e6d', '#f17ba8', '#6db3f5', '#c0cf5f',
 ];
-const DONUT_OTHER = '#5b6472';
-const DONUT_TOP_N = 7;
+export const DONUT_OTHER = '#5b6472';
+export const DONUT_TOP_N = 7;
 
-type DonutSlice = { id: string; name: string; value: number; color: string };
+export type DonutSlice = {
+  id: string;
+  name: string;
+  value: number;
+  color: string;
+};
 
-function donutValue(row: BudgetRow, mode: DonutMode): number {
+export function donutValue(row: BudgetRow, mode: DonutMode): number {
   return mode === 'ist' ? row.spent : row.budget?.monthly_limit ?? 0;
 }
 
-function buildDonutColorMap(rows: BudgetRow[]): Map<string, string> {
+export function buildDonutColorMap(rows: BudgetRow[]): Map<string, string> {
   const ordered = [...rows].sort(
     (a, b) =>
       Math.max(b.spent, b.budget?.monthly_limit ?? 0) -
@@ -481,7 +486,7 @@ function buildDonutColorMap(rows: BudgetRow[]): Map<string, string> {
   return map;
 }
 
-function buildDonutSlices(
+export function buildDonutSlices(
   rows: BudgetRow[],
   mode: DonutMode,
   colorMap: Map<string, string>,
@@ -1112,7 +1117,9 @@ function CreateCategoryForm({
       reset();
       setOpen(false);
     } catch (err) {
-      setCreateError(extractCreateError(err));
+      setCreateError(
+        extractApiError(err, 'Kategorie konnte nicht angelegt werden'),
+      );
     }
   };
 
@@ -1210,15 +1217,4 @@ function CreateCategoryForm({
       )}
     </section>
   );
-}
-
-function extractCreateError(err: unknown): string {
-  if (isAxiosError(err)) {
-    const detail = err.response?.data?.detail;
-    if (typeof detail === 'string') return detail;
-    if (Array.isArray(detail) && detail[0]?.msg) {
-      return String(detail[0].msg);
-    }
-  }
-  return 'Kategorie konnte nicht angelegt werden';
 }

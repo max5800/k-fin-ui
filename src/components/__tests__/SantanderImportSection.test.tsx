@@ -38,6 +38,19 @@ function uploadPdfs(container: HTMLElement, count = 1) {
   fireEvent.change(input, { target: { files } });
 }
 
+// Upload one file with a forced byte size — `File.size` is read-only, so
+// we patch the descriptor for the oversize-rejection test.
+function uploadSized(
+  container: HTMLElement,
+  opts: { name: string; type: string; size: number },
+) {
+  const input = container.querySelector('input[type="file"]');
+  if (!input) throw new Error('file input not found');
+  const file = new File(['%PDF-1.4'], opts.name, { type: opts.type });
+  Object.defineProperty(file, 'size', { value: opts.size });
+  fireEvent.change(input, { target: { files: [file] } });
+}
+
 describe('SantanderImportSection', () => {
   beforeEach(() => {
     mockPostImpl = async () => ({ data: {} });
@@ -106,5 +119,46 @@ describe('SantanderImportSection', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(
       'no statement PDF',
     );
+  });
+
+  it('rejects an oversized PDF client-side without uploading', async () => {
+    let posted = false;
+    mockPostImpl = async () => {
+      posted = true;
+      return { data: {} };
+    };
+    const { container } = renderSection();
+
+    uploadSized(container, {
+      name: 'statement.pdf',
+      type: 'application/pdf',
+      size: 21 * 1024 * 1024, // over the 20 MB PDF cap
+    });
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('zu groß');
+    expect(posted).toBe(false);
+  });
+
+  it('renders each per-file warning as its own list item', async () => {
+    mockPostImpl = async () => ({
+      data: {
+        statements: 0,
+        parsed: 0,
+        inserted: 0,
+        duplicates: 0,
+        normalized: 0,
+        errors: [
+          'statement-0.pdf: not a recognisable 1plus-Card statement',
+          'statement-1.pdf: balance mismatch',
+        ],
+      },
+    });
+    const { container } = renderSection();
+
+    uploadPdfs(container, 2);
+
+    await screen.findByText(/balance mismatch/i);
+    const items = container.querySelectorAll('ul li');
+    expect(items).toHaveLength(2);
   });
 });

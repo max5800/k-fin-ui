@@ -14,6 +14,7 @@ import { useSettings, useTestWebhook, useUpdateSettings } from '../api/settings'
 import { useChangePassword } from '../api/auth';
 import { useEscapeKey } from '../lib/useEscapeKey';
 import { tanModalSubtitle, tanModalInstruction } from '../lib/tanInstructions';
+import { extractApiError } from '../lib/apiError';
 import BackfillSection from './BackfillSection';
 import PaypalImportSection from './PaypalImportSection';
 import SantanderImportSection from './SantanderImportSection';
@@ -36,6 +37,17 @@ function isValidDiscordWebhook(url: string): boolean {
   if (url === '') return true;
   return DISCORD_WEBHOOK_PREFIXES.some((p) => url.startsWith(p));
 }
+
+// Fallback provider for the TAN modal when the sync-start response carries
+// no `provider` block (pre-P2a backends). Routing it through the same
+// `tanInstructions` helpers keeps the Comdirect copy in one place instead
+// of hardcoding the subtitle + instruction paragraph here.
+const COMDIRECT_FALLBACK_PROVIDER: SyncProviderInfo = {
+  source: 'comdirect',
+  display_name: 'Comdirect',
+  tan_kind: 'decoupled_app_push',
+  display_hint: 'photoTAN',
+};
 
 export default function Settings() {
   const queryClient = useQueryClient();
@@ -87,7 +99,7 @@ export default function Settings() {
       setPendingSessionId(res.session_id);
       setSyncProvider(res.provider ?? null);
     } catch (err) {
-      setTanError(extractError(err, 'Sync konnte nicht gestartet werden'));
+      setTanError(extractApiError(err, 'Sync konnte nicht gestartet werden'));
     }
   };
 
@@ -105,7 +117,7 @@ export default function Settings() {
           `Für KI-Kategorisierung: «Agents» öffnen.`,
       );
     } catch (err) {
-      setTanError(extractError(err, 'Bestätigung fehlgeschlagen'));
+      setTanError(extractApiError(err, 'Bestätigung fehlgeschlagen'));
     }
   };
 
@@ -148,7 +160,7 @@ export default function Settings() {
         return;
       }
       setWebhookError(
-        extractError(err, 'Webhook konnte nicht gespeichert werden'),
+        extractApiError(err, 'Webhook konnte nicht gespeichert werden'),
       );
     }
   };
@@ -173,7 +185,7 @@ export default function Settings() {
     } catch (err) {
       setWebhookTestResult({
         ok: false,
-        message: extractError(err, 'Test-Send fehlgeschlagen'),
+        message: extractApiError(err, 'Test-Send fehlgeschlagen'),
       });
     }
   };
@@ -192,7 +204,7 @@ export default function Settings() {
       setCurrentPw('');
       setNewPw('');
     } catch (err) {
-      setPwError(extractError(err, 'Passwort konnte nicht geändert werden'));
+      setPwError(extractApiError(err, 'Passwort konnte nicht geändert werden'));
     }
   };
 
@@ -614,9 +626,9 @@ export default function Settings() {
                   <div>
                     <h3 id="tan-confirm-title" className="font-headline font-bold text-on-surface">Push-TAN bestätigen</h3>
                     <p className="text-xs text-on-surface-variant">
-                      {syncProvider
-                        ? tanModalSubtitle(syncProvider)
-                        : 'Comdirect photoTAN App'}
+                      {tanModalSubtitle(
+                        syncProvider ?? COMDIRECT_FALLBACK_PROVIDER,
+                      )}
                     </p>
                   </div>
                 </div>
@@ -631,13 +643,9 @@ export default function Settings() {
               </div>
 
               <p className="text-sm text-on-surface-variant leading-relaxed mb-6">
-                {syncProvider
-                  ? tanModalInstruction(syncProvider)
-                  : 'Öffne die Comdirect photoTAN App auf deinem Smartphone und ' +
-                    'bestätige die Anmeldung. Klicke danach unten auf ' +
-                    '«Bestätigt» — Comdirect-Daten werden geladen und ' +
-                    'normalisiert (~10–20 s). KI-Kategorisierung startest du ' +
-                    'danach separat unter «Agents».'}
+                {tanModalInstruction(
+                  syncProvider ?? COMDIRECT_FALLBACK_PROVIDER,
+                )}
               </p>
 
               {tanError && (
@@ -679,12 +687,4 @@ export default function Settings() {
       </AnimatePresence>
     </div>
   );
-}
-
-function extractError(err: unknown, fallback: string): string {
-  if (isAxiosError(err)) {
-    const detail = err.response?.data?.detail;
-    if (typeof detail === 'string') return detail;
-  }
-  return fallback;
 }
