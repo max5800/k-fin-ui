@@ -1,3 +1,10 @@
+# [1.20.0](https://github.com/max5800/k-fin-ui/compare/v1.19.0...v1.20.0) (2026-05-27)
+
+
+### Features
+
+* show transaction links in details ([2f0596b](https://github.com/max5800/k-fin-ui/commit/2f0596b190f298089b7593f3ba0b42aa545f2482))
+
 # [1.20.0-develop.1](https://github.com/max5800/k-fin-ui/compare/v1.19.0...v1.20.0-develop.1) (2026-05-27)
 
 
