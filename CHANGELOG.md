@@ -1,3 +1,10 @@
+# [1.18.0](https://github.com/max5800/k-fin-ui/compare/v1.17.0...v1.18.0) (2026-05-27)
+
+
+### Features
+
+* show app versions in top bar ([a1d2bf6](https://github.com/max5800/k-fin-ui/commit/a1d2bf671ce53373ccb82abef1b62fa5ea36d520))
+
 # [1.17.0](https://github.com/max5800/k-fin-ui/compare/v1.16.1...v1.17.0) (2026-05-17)
 
 
