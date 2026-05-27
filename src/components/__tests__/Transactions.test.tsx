@@ -8,6 +8,7 @@ import type { Transaction } from '../../api/types';
 // Mock api modules used by the component.
 vi.mock('../../api/transactions', () => ({
   useTransactions: vi.fn(),
+  useTransactionLinks: vi.fn(),
   useUpdateTransaction: vi.fn(),
   downloadTransactionsCsv: vi.fn(),
 }));
@@ -15,13 +16,18 @@ vi.mock('../../api/categories', () => ({
   useCategories: vi.fn(),
   useTags: vi.fn(),
 }));
+vi.mock('../../api/settings', () => ({
+  useSettings: vi.fn(),
+}));
 
 import {
   useTransactions,
+  useTransactionLinks,
   useUpdateTransaction,
   downloadTransactionsCsv,
 } from '../../api/transactions';
 import { useCategories, useTags } from '../../api/categories';
+import { useSettings } from '../../api/settings';
 import Transactions from '../Transactions';
 
 function renderTransactions(initialEntries: string[] = ['/transactions']) {
@@ -57,6 +63,16 @@ const sampleTx: Transaction = {
   created_at: '2026-04-10T00:00:00Z',
   updated_at: '2026-04-10T00:00:00Z',
 };
+
+beforeEach(() => {
+  vi.mocked(useTransactionLinks).mockReturnValue({
+    data: { transaction_id: 'txn-1', children: [], parents: [] },
+    isPending: false,
+  } as unknown as ReturnType<typeof useTransactionLinks>);
+  vi.mocked(useSettings).mockReturnValue({
+    data: { page_size: 25, auto_apply_confidence: 0.6, own_ibans: [] },
+  } as unknown as ReturnType<typeof useSettings>);
+});
 
 describe('Transactions — CSV-Export-Button', () => {
   beforeEach(() => {
@@ -268,5 +284,99 @@ describe('Transactions — source filter chips', () => {
     expect(useTransactions).toHaveBeenCalledWith(
       expect.objectContaining({ source: 'comdirect' }),
     );
+  });
+});
+
+describe('Transactions — aggregate links panel', () => {
+  beforeEach(() => {
+    vi.mocked(useTransactions).mockReturnValue({
+      data: { items: [sampleTx], total: 1, limit: 25, offset: 0 },
+      isPending: false,
+    } as unknown as ReturnType<typeof useTransactions>);
+    vi.mocked(useUpdateTransaction).mockReturnValue({
+      mutate: vi.fn(),
+      isPending: false,
+    } as unknown as ReturnType<typeof useUpdateTransaction>);
+    vi.mocked(useCategories).mockReturnValue({
+      data: [{ id: 'groceries', name: 'Lebensmittel', type: 'variabel' }],
+    } as unknown as ReturnType<typeof useCategories>);
+    vi.mocked(useTags).mockReturnValue({
+      data: [],
+    } as unknown as ReturnType<typeof useTags>);
+  });
+
+  afterEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('shows child transactions for an aggregate parent', async () => {
+    const user = userEvent.setup();
+    vi.mocked(useTransactionLinks).mockReturnValue({
+      data: {
+        transaction_id: 'txn-1',
+        children: [
+          {
+            id: 'link-1',
+            link_type: 'paypal_aggregate',
+            transaction: {
+              ...sampleTx,
+              id: 'txn-child',
+              source: 'paypal',
+              recipient: 'STEAMGAMES',
+              description: 'STEAMGAMES',
+              internal_transfer: false,
+            },
+          },
+        ],
+        parents: [],
+      },
+      isPending: false,
+    } as unknown as ReturnType<typeof useTransactionLinks>);
+
+    renderTransactions();
+    await user.click(screen.getByRole('button', { name: /transaktion bearbeiten: rewe/i }));
+
+    expect(screen.getByText('Sammelposten')).toBeInTheDocument();
+    expect(screen.getByText('STEAMGAMES')).toBeInTheDocument();
+  });
+
+  it('shows the parent transaction for a linked child', async () => {
+    const user = userEvent.setup();
+    vi.mocked(useTransactionLinks).mockReturnValue({
+      data: {
+        transaction_id: 'txn-1',
+        children: [],
+        parents: [
+          {
+            id: 'link-1',
+            link_type: 'paypal_aggregate',
+            transaction: {
+              ...sampleTx,
+              id: 'txn-parent',
+              recipient: 'PAYPAL EUROPE',
+              description: 'PAYPAL EUROPE',
+              internal_transfer: true,
+            },
+          },
+        ],
+      },
+      isPending: false,
+    } as unknown as ReturnType<typeof useTransactionLinks>);
+
+    renderTransactions();
+    await user.click(screen.getByRole('button', { name: /transaktion bearbeiten: rewe/i }));
+
+    expect(screen.getByText('Teil von Sammelposten')).toBeInTheDocument();
+    expect(screen.getByText('PAYPAL EUROPE')).toBeInTheDocument();
+  });
+
+  it('keeps the panel quiet when there are no links', async () => {
+    const user = userEvent.setup();
+
+    renderTransactions();
+    await user.click(screen.getByRole('button', { name: /transaktion bearbeiten: rewe/i }));
+
+    expect(screen.queryByText('Sammelposten')).not.toBeInTheDocument();
+    expect(screen.queryByText('Teil von Sammelposten')).not.toBeInTheDocument();
   });
 });

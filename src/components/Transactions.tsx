@@ -5,6 +5,7 @@ import {
   ChevronRight,
   Download,
   Hash,
+  Link2,
   Receipt,
   RotateCcw,
   Search,
@@ -15,6 +16,7 @@ import { useCallback, useMemo, useRef, useState, useEffect } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   downloadTransactionsCsv,
+  useTransactionLinks,
   useTransactions,
   useUpdateTransaction,
 } from '../api/transactions';
@@ -24,7 +26,7 @@ import { formatCurrency, formatDate } from '../lib/format';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import type { Transaction } from '../api/types';
+import type { Transaction, TransactionLinks } from '../api/types';
 import { DATA_SOURCE_LIST, type DataSource, isDataSource } from '../lib/dataSources';
 
 const editSchema = z.object({
@@ -108,6 +110,9 @@ export default function Transactions() {
   const { data: categories } = useCategories();
   const { data: tags } = useTags();
   const { mutate: updateTx, isPending: isUpdating } = useUpdateTransaction();
+  const { data: selectedLinks, isPending: isLinksPending } = useTransactionLinks(
+    selectedTx?.id,
+  );
 
   const visibleItems = txData?.items ?? [];
 
@@ -570,6 +575,8 @@ export default function Transactions() {
                 </p>
               </div>
 
+              <TransactionLinksPanel links={selectedLinks} isPending={isLinksPending} />
+
               <form
                 id="edit-tx-form"
                 onSubmit={handleSubmit(onSubmit)}
@@ -661,6 +668,99 @@ export default function Transactions() {
           )}
         </AnimatePresence>
       </div>
+    </div>
+  );
+}
+
+function TransactionLinksPanel({
+  links,
+  isPending,
+}: {
+  links: TransactionLinks | undefined;
+  isPending: boolean;
+}) {
+  if (isPending) {
+    return (
+      <div className="mb-6 border-y border-white/5 py-4">
+        <div className="h-4 w-32 bg-white/5 rounded animate-pulse mb-3" />
+        <div className="h-12 bg-white/5 rounded-lg animate-pulse" />
+      </div>
+    );
+  }
+
+  const children = links?.children ?? [];
+  const parents = links?.parents ?? [];
+  if (children.length === 0 && parents.length === 0) return null;
+
+  const childSum = children.reduce(
+    (sum, link) => sum + link.transaction.amount,
+    0,
+  );
+
+  return (
+    <div className="mb-6 border-y border-white/5 py-4 space-y-4">
+      {children.length > 0 && (
+        <section className="space-y-2">
+          <div className="flex items-center justify-between gap-3">
+            <h4 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+              <Link2 className="w-3.5 h-3.5" />
+              Sammelposten
+            </h4>
+            <span className="text-xs font-bold tabular-nums text-on-surface">
+              {formatCurrency(childSum)}
+            </span>
+          </div>
+          <div className="divide-y divide-white/5">
+            {children.map((link) => (
+              <div key={link.id}>
+                <LinkedTransactionRow tx={link.transaction} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {parents.length > 0 && (
+        <section className="space-y-2">
+          <h4 className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            <Link2 className="w-3.5 h-3.5" />
+            Teil von Sammelposten
+          </h4>
+          <div className="divide-y divide-white/5">
+            {parents.map((link) => (
+              <div key={link.id}>
+                <LinkedTransactionRow tx={link.transaction} />
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
+function LinkedTransactionRow({ tx }: { tx: Transaction }) {
+  const name = tx.recipient || tx.sender || tx.description || 'Unbekannt';
+  const sourceLabel =
+    DATA_SOURCE_LIST.find((source) => source.value === tx.source)?.chipLabel ??
+    tx.source;
+
+  return (
+    <div className="flex items-start justify-between gap-3 py-2.5">
+      <div className="min-w-0">
+        <p className="text-sm font-bold text-on-surface truncate">{name}</p>
+        <p className="text-[10px] text-on-surface-variant/60 font-bold uppercase tracking-widest">
+          {formatDate(tx.booking_date, 'dd.MM.yyyy')} · {sourceLabel}
+        </p>
+      </div>
+      <span
+        className={`shrink-0 text-sm font-bold tabular-nums ${
+          tx.amount > 0 ? 'text-primary' : 'text-on-surface'
+        }`}
+      >
+        {tx.amount > 0 ? '+' : ''}
+        {formatCurrency(tx.amount)}
+      </span>
     </div>
   );
 }

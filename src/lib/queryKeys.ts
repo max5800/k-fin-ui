@@ -32,6 +32,7 @@ export const qk = {
     all: ['transactions'] as const,
     list: (filters: TxFilters) => ['transactions', 'list', filters] as const,
     detail: (id: string) => ['transactions', 'detail', id] as const,
+    links: (id: string) => ['transactions', 'links', id] as const,
   },
   categories: { 
     all: ['categories'] as const, 

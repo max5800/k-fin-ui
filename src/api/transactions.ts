@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 import { qk, type TxFilters } from '../lib/queryKeys';
-import type { Transaction, PaginatedResponse } from './types';
+import type { Transaction, TransactionLinks, PaginatedResponse } from './types';
 
 export type ExportFilters = Pick<
   TxFilters,
@@ -120,6 +120,18 @@ export function useTransaction(id: string) {
   });
 }
 
+export function useTransactionLinks(id: string | null | undefined) {
+  const txId = id ?? '';
+  return useQuery({
+    queryKey: qk.transactions.links(txId),
+    queryFn: async () => {
+      const { data } = await apiClient.get<TransactionLinks>(`/transactions/${txId}/links`);
+      return data;
+    },
+    enabled: !!txId,
+  });
+}
+
 export type TransactionPatch = {
   id: string;
   category_id?: string | null;
@@ -144,6 +156,7 @@ export function useUpdateTransaction() {
       // the dashboard refreshes after a refund/transfer reclassification.
       queryClient.invalidateQueries({ queryKey: qk.transactions.all });
       queryClient.invalidateQueries({ queryKey: qk.transactions.detail(data.id) });
+      queryClient.invalidateQueries({ queryKey: qk.transactions.links(data.id) });
       queryClient.invalidateQueries({ queryKey: ['aggregates'] });
     },
   });

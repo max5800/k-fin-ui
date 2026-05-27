@@ -63,6 +63,18 @@ export type Transaction = {
   updated_at: string;
 };
 
+export type TransactionLinkItem = {
+  id: string;
+  link_type: string;
+  transaction: Transaction;
+};
+
+export type TransactionLinks = {
+  transaction_id: string;
+  children: TransactionLinkItem[];
+  parents: TransactionLinkItem[];
+};
+
 export type Budget = {
   category_id: string;
   monthly_limit: number;
