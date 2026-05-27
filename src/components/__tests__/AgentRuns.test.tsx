@@ -6,6 +6,7 @@ import type { Run, RunStatus } from '../../api/types';
 import AgentRuns from '../AgentRuns';
 
 const mockUseRuns = vi.fn();
+const mockUseRunHealth = vi.fn();
 const mockTriggerRun = vi.fn();
 const mockTriggerFull = vi.fn();
 const mockCancelRun = vi.fn();
@@ -13,6 +14,7 @@ const mockRerunRun = vi.fn();
 
 vi.mock('../../api/runs', () => ({
   useRuns: (filters: unknown) => mockUseRuns(filters),
+  useRunHealth: (windowDays: number) => mockUseRunHealth(windowDays),
   useTriggerRun: () => ({
     mutate: mockTriggerRun,
     isPending: false,
@@ -34,6 +36,10 @@ vi.mock('../../api/runs', () => ({
     error: null,
     reset: vi.fn(),
   }),
+}));
+
+vi.mock('../../api/settings', () => ({
+  useSettings: () => ({ data: { page_size: 20 } }),
 }));
 
 function renderRuns() {
@@ -76,6 +82,27 @@ function makeRun(overrides: Partial<Run> & { id: string; status: RunStatus }): R
 describe('AgentRuns rerun button', () => {
   beforeEach(() => {
     mockUseRuns.mockReset();
+    mockUseRunHealth.mockReset();
+    mockUseRunHealth.mockReturnValue({
+      data: {
+        window_days: 7,
+        threshold: 0.6,
+        runs_total: 0,
+        suggestions_total: 0,
+        high_confidence_total: 0,
+        auto_apply_rate: null,
+        avg_confidence: null,
+        memory_batches_total: 0,
+        memory_batches_with_hits: 0,
+        memory_hit_rate: null,
+        memory_hits_total: 0,
+        low_conf_with_memory: 0,
+        low_conf_without_memory: 0,
+        pending_by_source: [],
+        pending_total: 0,
+      },
+      isPending: false,
+    });
     mockTriggerRun.mockReset();
     mockTriggerFull.mockReset();
     mockCancelRun.mockReset();
@@ -150,5 +177,50 @@ describe('AgentRuns rerun button', () => {
     await user.click(button);
     expect(mockRerunRun).toHaveBeenCalledTimes(1);
     expect(mockRerunRun).toHaveBeenCalledWith('run-failed');
+  });
+
+  it('renders the agents health card', () => {
+    mockUseRuns.mockReturnValue({
+      data: {
+        items: [],
+        total: 0,
+        limit: 20,
+        offset: 0,
+      },
+      isPending: false,
+    });
+    mockUseRunHealth.mockReturnValue({
+      data: {
+        window_days: 7,
+        threshold: 0.6,
+        runs_total: 2,
+        suggestions_total: 4,
+        high_confidence_total: 3,
+        auto_apply_rate: 0.75,
+        avg_confidence: 0.7,
+        memory_batches_total: 3,
+        memory_batches_with_hits: 2,
+        memory_hit_rate: 2 / 3,
+        memory_hits_total: 5,
+        low_conf_with_memory: 1,
+        low_conf_without_memory: 1,
+        pending_by_source: [
+          { source: 'paypal', pending: 1 },
+          { source: 'santander_cc', pending: 2 },
+        ],
+        pending_total: 3,
+      },
+      isPending: false,
+    });
+
+    renderRuns();
+
+    const card = screen.getByLabelText('Agents Health');
+    expect(within(card).getByText('75%')).toBeInTheDocument();
+    expect(within(card).getByText('67%')).toBeInTheDocument();
+    expect(within(card).getByText('3/4')).toBeInTheDocument();
+    expect(within(card).getByText('PayPal: 1')).toBeInTheDocument();
+    expect(within(card).getByText('Santander: 2')).toBeInTheDocument();
+    expect(mockUseRunHealth).toHaveBeenCalledWith(7);
   });
 });

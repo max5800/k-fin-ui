@@ -1,4 +1,5 @@
 import {
+  Activity,
   AlertTriangle,
   Ban,
   Calendar,
@@ -21,6 +22,7 @@ import { createPortal } from 'react-dom';
 import {
   useCancelRun,
   useRerunRun,
+  useRunHealth,
   useRuns,
   useTriggerFullPipeline,
   useTriggerRun,
@@ -28,7 +30,7 @@ import {
 import { useSettings } from '../api/settings';
 import { formatDate } from '../lib/format';
 import { useEscapeKey } from '../lib/useEscapeKey';
-import type { AgentName, Run, RunStatus } from '../api/types';
+import type { AgentName, Run, RunHealth, RunStatus } from '../api/types';
 
 type PendingTrigger =
   | { kind: 'full' }
@@ -146,6 +148,9 @@ export default function AgentRuns() {
   const { data: runsData, isPending: isHistoryPending } = useRuns({
     limit: runsListLimit,
   });
+  const healthWindowDays = 7;
+  const { data: healthData, isPending: isHealthPending } =
+    useRunHealth(healthWindowDays);
   const { mutate: triggerRun, isPending: isTriggering, variables: triggeringAgent } =
     useTriggerRun();
   const { mutate: triggerFull, isPending: isTriggeringFull } = useTriggerFullPipeline();
@@ -281,6 +286,12 @@ export default function AgentRuns() {
         sampleSize={runsData?.items.length ?? 0}
         sampleCap={runsListLimit}
         isPending={isHistoryPending}
+      />
+
+      <AgentHealthCard
+        health={healthData}
+        windowDays={healthWindowDays}
+        isPending={isHealthPending}
       />
 
       <PeriodPicker
@@ -1093,6 +1104,17 @@ function formatCostUsd(value: number): string {
   return `$${value.toFixed(2)}`;
 }
 
+function formatPercent(value: number | null | undefined): string {
+  if (value === null || value === undefined) return '—';
+  return `${Math.round(value * 100)}%`;
+}
+
+const SOURCE_LABEL: Record<string, string> = {
+  comdirect: 'Comdirect',
+  paypal: 'PayPal',
+  santander_cc: 'Santander',
+};
+
 function MonthlyCostCard({
   summary,
   sampleSize,
@@ -1146,6 +1168,74 @@ function MonthlyCostCard({
           ? `Aggregat über die letzten ${sampleCap} Runs — ältere Runs in diesem Monat fehlen.`
           : 'Aggregat über alle Runs in der Liste, client-seitig berechnet.'}
       </p>
+    </section>
+  );
+}
+
+function AgentHealthCard({
+  health,
+  windowDays,
+  isPending,
+}: {
+  health: RunHealth | undefined;
+  windowDays: number;
+  isPending: boolean;
+}) {
+  const pendingSources = health?.pending_by_source ?? [];
+  return (
+    <section
+      aria-label="Agents Health"
+      className="mb-6 flex flex-wrap items-center gap-x-8 gap-y-3 bg-surface-container-low rounded-2xl border border-white/5 px-6 py-4"
+    >
+      <div className="flex items-center gap-3">
+        <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+          <Activity className="h-4 w-4" />
+        </span>
+        <div>
+          <span className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+            Health
+          </span>
+          <span className="text-xs text-on-surface-variant">
+            letzte {windowDays} Tage
+          </span>
+        </div>
+      </div>
+      <Stat
+        label="Auto-Apply"
+        value={isPending ? '…' : formatPercent(health?.auto_apply_rate)}
+        emphasize
+      />
+      <Stat
+        label="Suggestions"
+        value={
+          isPending || !health
+            ? '…'
+            : `${health.high_confidence_total}/${health.suggestions_total}`
+        }
+      />
+      <Stat
+        label="Memory-Hits"
+        value={isPending ? '…' : formatPercent(health?.memory_hit_rate)}
+      />
+      <div className="min-w-[220px] flex-1">
+        <span className="block text-[10px] font-bold uppercase tracking-widest text-on-surface-variant">
+          Pending
+        </span>
+        <div className="mt-1 flex flex-wrap items-center gap-2">
+          <span className="text-lg font-bold tabular-nums text-on-surface">
+            {isPending || !health ? '…' : health.pending_total}
+          </span>
+          {!isPending &&
+            pendingSources.map((item) => (
+              <span
+                key={item.source}
+                className="rounded-md bg-surface-container-high px-2 py-1 text-[11px] font-bold text-on-surface-variant"
+              >
+                {SOURCE_LABEL[item.source] ?? item.source}: {item.pending}
+              </span>
+            ))}
+        </div>
+      </div>
     </section>
   );
 }

@@ -46,7 +46,8 @@ export const qk = {
   runs: { 
     all: ['runs'] as const, 
     list: (f: RunFilters) => ['runs', 'list', f] as const,
-    detail: (id: string) => ['runs', 'detail', id] as const 
+    detail: (id: string) => ['runs', 'detail', id] as const,
+    health: (windowDays: number) => ['runs', 'health', windowDays] as const,
   },
   reports: { 
     all: ['reports'] as const, 

@@ -106,6 +106,29 @@ export type Run = {
   usage_detail: Record<string, UsageBreakdownEntry> | null;
 };
 
+export type RunHealthPendingSource = {
+  source: string;
+  pending: number;
+};
+
+export type RunHealth = {
+  window_days: number;
+  threshold: number;
+  runs_total: number;
+  suggestions_total: number;
+  high_confidence_total: number;
+  auto_apply_rate: number | null;
+  avg_confidence: number | null;
+  memory_batches_total: number;
+  memory_batches_with_hits: number;
+  memory_hit_rate: number | null;
+  memory_hits_total: number;
+  low_conf_with_memory: number;
+  low_conf_without_memory: number;
+  pending_by_source: RunHealthPendingSource[];
+  pending_total: number;
+};
+
 export type AppSettings = {
   auto_apply_confidence: number;
   // Transactions table page size — backend clamps to [10, 200], default 25.

@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { apiClient } from './client';
 import { qk, type RunFilters } from '../lib/queryKeys';
-import type { Run, PaginatedResponse } from './types';
+import type { Run, RunHealth, PaginatedResponse } from './types';
 
 export function useRuns(filters: RunFilters) {
   return useQuery({
@@ -35,6 +35,19 @@ export function useRun(id: string) {
       const run = query.state.data as Run | undefined;
       return run?.status === 'pending' || run?.status === 'running' ? 5000 : false;
     }
+  });
+}
+
+export function useRunHealth(windowDays = 7) {
+  return useQuery({
+    queryKey: qk.runs.health(windowDays),
+    queryFn: async () => {
+      const { data } = await apiClient.get<RunHealth>('/runs/health', {
+        params: { window_days: windowDays },
+      });
+      return data;
+    },
+    refetchInterval: 60_000,
   });
 }
 
