@@ -78,6 +78,10 @@ describe('qk.sync key factory', () => {
     expect(qk.sync.backfillRun('run-1')).toEqual(['backfill-run', 'run-1']);
     expect(qk.sync.backfillRun(null)).toEqual(['backfill-run', null]);
   });
+
+  it('exposes a stable key for app version metadata', () => {
+    expect(qk.meta.version).toEqual(['meta', 'version']);
+  });
 });
 
 describe('useStartSync', () => {

@@ -1,4 +1,5 @@
 import { RefreshCw } from 'lucide-react';
+import { FRONTEND_VERSION, useAppVersion } from '../api/meta';
 import { useLastSync } from '../api/sync';
 import { formatRelativeDate } from '../lib/format';
 import { dataSourceLabel } from '../lib/dataSources';
@@ -32,6 +33,26 @@ function LastSyncIndicator() {
   );
 }
 
+function formatVersion(version: string | undefined | null) {
+  if (!version || version === 'unknown') return null;
+  return version.startsWith('v') ? version : `v${version}`;
+}
+
+function VersionIndicator() {
+  const { data } = useAppVersion();
+  const frontend = formatVersion(FRONTEND_VERSION);
+  const backend = formatVersion(data?.backend_version);
+  if (!frontend && !backend) return null;
+
+  return (
+    <div className="hidden lg:flex items-center gap-2 text-[11px] text-on-surface-variant font-medium tabular-nums">
+      {frontend && <span>FE {frontend}</span>}
+      {frontend && backend && <span className="opacity-30">•</span>}
+      {backend && <span>BE {backend}</span>}
+    </div>
+  );
+}
+
 export default function TopBar({ title, subtitle }: TopBarProps) {
   const displayName = localStorage.getItem('kfin_display_name');
 
@@ -51,6 +72,7 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
       </div>
       <div className="flex items-center gap-6">
         <LastSyncIndicator />
+        <VersionIndicator />
         {displayName && (
           <span className="text-xs text-on-surface-variant font-medium">
             Hi, {displayName}

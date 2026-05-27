@@ -62,6 +62,9 @@ export const qk = {
   settings: {
     all: ['settings'] as const,
   },
+  meta: {
+    version: ['meta', 'version'] as const,
+  },
   categorization: {
     pending: ['categorization', 'pending'] as const,
   },
