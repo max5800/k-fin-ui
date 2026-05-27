@@ -1,3 +1,10 @@
+# [1.19.0](https://github.com/max5800/k-fin-ui/compare/v1.18.0...v1.19.0) (2026-05-27)
+
+
+### Features
+
+* **agents:** show health metrics ([0069383](https://github.com/max5800/k-fin-ui/commit/00693838d54df758cbd4e254c435bf1435f86fcf))
+
 # [1.18.0](https://github.com/max5800/k-fin-ui/compare/v1.17.0...v1.18.0) (2026-05-27)
 
 
