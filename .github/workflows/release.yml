@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - develop
 
 permissions:
   contents: write
@@ -48,7 +49,7 @@ jobs:
   publish:
     name: Publish UI Image
     needs: release
-    if: needs.release.outputs.published == 'true' && github.ref == 'refs/heads/main'
+    if: needs.release.outputs.published == 'true'
     runs-on: ubuntu-latest
 
     steps:
@@ -62,15 +63,25 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Resolve image tags
+        id: image-tags
+        run: |
+          {
+            echo "ui<<EOF"
+            echo "ghcr.io/max5800/k-fin-ui:v${{ needs.release.outputs.version }}"
+            if [ "${{ github.ref }}" = "refs/heads/main" ]; then
+              echo "ghcr.io/max5800/k-fin-ui:latest"
+            fi
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
       - name: Build and push UI image
         uses: docker/build-push-action@v5
         with:
           context: .
           file: Dockerfile
           push: true
-          tags: |
-            ghcr.io/max5800/k-fin-ui:v${{ needs.release.outputs.version }}
-            ghcr.io/max5800/k-fin-ui:latest
+          tags: ${{ steps.image-tags.outputs.ui }}
 
   update-fleet:
     name: Pin Fleet UI version
