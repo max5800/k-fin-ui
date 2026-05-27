@@ -4,7 +4,6 @@ on:
   push:
     branches:
       - main
-      - develop
 
 permissions:
   contents: write
@@ -49,7 +48,7 @@ jobs:
   publish:
     name: Publish UI Image
     needs: release
-    if: needs.release.outputs.published == 'true'
+    if: needs.release.outputs.published == 'true' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
 
     steps:
@@ -78,7 +77,7 @@ jobs:
     needs: [release, publish]
     # Homelab-only step. Skipped on forks because the target repo and the
     # HOME_LAB_PAT secret only exist for max5800.
-    if: needs.release.outputs.published == 'true' && github.repository_owner == 'max5800'
+    if: needs.release.outputs.published == 'true' && github.ref == 'refs/heads/main' && github.repository_owner == 'max5800'
     runs-on: ubuntu-latest
 
     steps:
