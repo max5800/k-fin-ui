@@ -3,6 +3,7 @@ import { FRONTEND_VERSION, useAppVersion } from '../api/meta';
 import { useLastSync } from '../api/sync';
 import { formatRelativeDate } from '../lib/format';
 import { dataSourceLabel } from '../lib/dataSources';
+import { DEMO_MODE } from '../demo/config';
 
 interface TopBarProps {
   title?: string;
@@ -71,6 +72,11 @@ export default function TopBar({ title, subtitle }: TopBarProps) {
         )}
       </div>
       <div className="flex items-center gap-6">
+        {DEMO_MODE && (
+          <span className="hidden sm:inline-flex items-center rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-[10px] font-bold uppercase tracking-widest text-primary">
+            Demo-Daten
+          </span>
+        )}
         <LastSyncIndicator />
         <VersionIndicator />
         {displayName && (

@@ -2,6 +2,7 @@ import { AlertTriangle, Database, FlaskConical, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useDevSeed, useDevStatus, useDevWipe } from '../api/dev';
+import { DEMO_MODE } from '../demo/config';
 
 type ConfirmTarget = 'wipe' | 'seed' | null;
 
@@ -90,8 +91,9 @@ export default function DevTools() {
         <h1 className="text-2xl font-headline font-bold">Dev Tools</h1>
       </div>
       <p className="text-sm text-on-surface-variant mb-8">
-        Nur auf der Dev-Stage verfügbar. Diese Aktionen verändern die Datenbank
-        sofort und unwiederbringlich. Keine echten Bankdaten hier ablegen.
+        {DEMO_MODE
+          ? 'Setzt die Browser-Demo zurueck oder spielt die fiktiven Beispielbuchungen neu ein. Es gibt kein Backend und keine echte Datenbank.'
+          : 'Nur auf der Dev-Stage verfügbar. Diese Aktionen verändern die Datenbank sofort und unwiederbringlich. Keine echten Bankdaten hier ablegen.'}
       </p>
 
       {lastError ? (

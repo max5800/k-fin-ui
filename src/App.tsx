@@ -51,7 +51,7 @@ export default function App() {
   return (
     <QueryClientProvider client={queryClient}>
       <ErrorBoundary FallbackComponent={GlobalErrorFallback}>
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
           <Routes>
             <Route path="/login" element={<Login />} />
             <Route path="/onboarding" element={<Onboarding />} />

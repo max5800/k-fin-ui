@@ -15,6 +15,8 @@ k-fin-ui — React 19 frontend for [k-fin](https://github.com/max5800/k-fin). Ta
 - `npm run lint` — `tsc --noEmit` (strict TypeScript)
 - `npm run test` — Vitest one-shot
 - `npm run test:watch` — Vitest in watch mode
+- `VITE_DEMO_MODE=true npm run dev` — backend-less browser demo
+- `VITE_DEMO_MODE=true npm run build` — static demo build for GitHub Pages
 
 ## Architecture
 
@@ -22,6 +24,7 @@ Single-page app, all server state through TanStack Query.
 
 - `src/api/` — axios client + per-resource modules (`transactions.ts`, `categories.ts`, `portfolio.ts`, `reports.ts`, `runs.ts`, `sync.ts`, `auth.ts`, `categorization.ts`, `aggregates.ts`, `settings.ts`). `client.ts` owns the auth interceptor and decimal parsing.
 - `src/components/` — page-level components (`Dashboard`, `Transactions`, `Categories`, `Portfolio`, `Reports`, `AgentRuns`, `Settings`, `Onboarding`, `BackfillSection`, `PendingReview`) plus shell (`MainLayout`, `Sidebar`, `TopBar`, `ProtectedRoute`, `Login`).
+- `src/demo/` — static public demo mode: browser-local mock adapter, fake dataset, and demo session helpers. No backend, DB, worker, bank auth, or secrets belong here.
 - `src/lib/` — `format.ts` (`Intl.NumberFormat('de-DE', EUR)`, date-fns `de` locale), `queryKeys.ts` (TanStack Query key factory).
 - `src/test/` — Vitest setup + jsdom env.
 - `server.js` — Express prod server with http-proxy-middleware to the k-fin backend.
@@ -43,6 +46,7 @@ Single-page app, all server state through TanStack Query.
 - **No real banking data anywhere.** Use obvious dummy values in tests, mocks, and Storybook-style fixtures: `DE00000000000000000000` for IBANs, `John Doe`, round numbers like `100.00 EUR`. Never paste a real Comdirect response into the repo.
 - **Never log sensitive data** (IBANs, balances, full account numbers, tokens, PINs) in `console.*`, telemetry, or error reporters. Mask in user-facing error states too.
 - **All secrets via env vars.** `.env` is git-ignored; `.env.example` is the public template with placeholders only.
+- **Public demo stays backend-less.** `VITE_DEMO_MODE=true` is a GitHub Pages/static showcase path. It must answer API calls from `src/demo/*` in the browser, persist only to `localStorage`, and use obvious dummy fixtures only. Do not add hosted services, real API credentials, Comdirect flows, databases, workers, or personal hostnames for the demo.
 - **Secret scanning is mandatory.** `.husky/pre-commit` runs `gitleaks protect --staged` against [.gitleaks.toml](.gitleaks.toml); CI re-runs it. When introducing a new secret-shaped pattern (credential env var, IBAN-shaped fixture, personal hostname), either fix it or add a narrow allowlist entry in `.gitleaks.toml` with a comment explaining why it's safe. Never use `git commit --no-verify`. Required tool: `brew install gitleaks`.
 - **Read-only against the bank.** The backend enforces this, but UI-side: never build a form that POSTs an order, transfer, or other write to Comdirect — those endpoints don't exist and shouldn't appear to.
 - **TanStack Query for server state.** Don't reinvent caching with `useState` + `useEffect`; use the keys from `src/lib/queryKeys.ts`.

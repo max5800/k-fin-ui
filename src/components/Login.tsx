@@ -1,12 +1,13 @@
 import { ArrowRight, Loader2, Lock, Mail, ShieldCheck } from 'lucide-react';
 import { motion } from 'motion/react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { isAxiosError } from 'axios';
 import { useLogin } from '../api/auth';
+import { DEMO_MODE, ensureDemoSession } from '../demo/config';
 
 const loginSchema = z.object({
   email: z.string().email('Gültige E-Mail erforderlich'),
@@ -21,6 +22,12 @@ export default function Login() {
   const sessionExpired = searchParams.get('expired') === '1';
   const login = useLogin();
   const [authError, setAuthError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!DEMO_MODE) return;
+    ensureDemoSession();
+    navigate('/', { replace: true });
+  }, [navigate]);
 
   const {
     register,

@@ -46,6 +46,21 @@ Frontend for [k-fin](https://github.com/max5800/k-fin) — React 19 + TypeScript
 
    Runs on [http://localhost:3000](http://localhost:3000).
 
+## Static demo
+
+The UI can run as a backend-less public demo. Set `VITE_DEMO_MODE=true` during
+the Vite build and every API call is answered from browser-local mock data.
+No FastAPI service, Postgres, Comdirect credentials, or worker is involved.
+
+```bash
+VITE_DEMO_MODE=true npm run build
+npm run preview
+```
+
+The GitHub Pages workflow in `.github/workflows/demo-pages.yml` builds that
+mode from `main` and publishes the static `dist/` artifact. Demo changes live
+only in `localStorage`; the Dev Tools page can reset and reseed the fake data.
+
 ## Scripts
 
 - `npm run dev` — Vite dev server (port 3000)

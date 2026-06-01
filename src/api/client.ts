@@ -1,10 +1,13 @@
 import axios from 'axios';
+import { DEMO_MODE } from '../demo/config';
+import { demoAdapter } from '../demo/mockAdapter';
 
 const apiBaseUrl =
   (import.meta as any).env.VITE_API_BASE_URL || 'http://localhost:8000/api/v1';
 
 export const apiClient = axios.create({
   baseURL: apiBaseUrl,
+  adapter: DEMO_MODE ? demoAdapter : undefined,
   // FastAPI consumes list query params as repeated keys
   // (`?tag_ids=a&tag_ids=b`), not as `tag_ids[]=a`. Axios 1.x defaults to
   // bracket notation; `indexes: null` switches to bare repeated keys so

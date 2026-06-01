@@ -51,25 +51,26 @@ function filenameFromContentDisposition(value: string | null): string | null {
 }
 
 export async function downloadReport(id: string): Promise<void> {
-  const url = `${apiClient.defaults.baseURL}/reports/${id}/download`;
-  const token = localStorage.getItem('kfin_token');
-
-  const response = await fetch(url, {
-    headers: { Authorization: `Bearer ${token}` },
+  const response = await apiClient.get<Blob>(`/reports/${id}/download`, {
+    responseType: 'blob',
   });
-  if (!response.ok) {
-    console.error('Report download failed:', response.status, await response.text());
-    return;
-  }
 
   // Backend sets Content-Disposition with the canonical filename
   // (`<report_type>-<period>.json` for JSON content, original file name
   // for disk-backed PDFs/MDs). Trust it instead of guessing the suffix.
   const filename =
-    filenameFromContentDisposition(response.headers.get('Content-Disposition')) ??
+    filenameFromContentDisposition(
+      (response.headers as { get?: (k: string) => string | null } | undefined)?.get?.(
+        'Content-Disposition',
+      ) ??
+        (response.headers as Record<string, string> | undefined)?.['content-disposition'] ??
+        null,
+    ) ??
     `report-${id}`;
 
-  const blob = await response.blob();
+  const blob = response.data instanceof Blob
+    ? response.data
+    : new Blob([response.data as unknown as BlobPart], { type: 'application/json' });
   const blobUrl = window.URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = blobUrl;

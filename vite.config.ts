@@ -12,6 +12,7 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, '.', '');
   const apiProxyTarget = env.VITE_API_PROXY_TARGET || 'http://localhost:8000';
   const appVersion = env.VITE_K_FIN_UI_VERSION || pkg.version || 'unknown';
+  const base = env.VITE_BASE_PATH || '/';
   const hmrClientPort = env.VITE_HMR_CLIENT_PORT
     ? Number(env.VITE_HMR_CLIENT_PORT)
     : undefined;
@@ -23,6 +24,7 @@ export default defineConfig(({ mode }) => {
     : ['localhost', '127.0.0.1'];
 
   return {
+    base,
     plugins: [react(), tailwindcss()],
     define: {
       __K_FIN_UI_VERSION__: JSON.stringify(appVersion),
