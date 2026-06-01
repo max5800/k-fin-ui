@@ -1,3 +1,10 @@
+## [1.20.1](https://github.com/max5800/k-fin-ui/compare/v1.20.0...v1.20.1) (2026-06-01)
+
+
+### Bug Fixes
+
+* **ci:** build UI image from release tag ([dcae19a](https://github.com/max5800/k-fin-ui/commit/dcae19acb74ceeaa764f80e379a0c4c6a08559d6))
+
 # [1.20.0](https://github.com/max5800/k-fin-ui/compare/v1.19.0...v1.20.0) (2026-05-27)
 
 
