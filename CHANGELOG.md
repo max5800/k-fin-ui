@@ -1,3 +1,10 @@
+# [1.21.0](https://github.com/max5800/k-fin-ui/compare/v1.20.1...v1.21.0) (2026-06-01)
+
+
+### Features
+
+* add static demo mode ([156197c](https://github.com/max5800/k-fin-ui/commit/156197c399620c93586bb48671eb265e6a432926))
+
 ## [1.20.1](https://github.com/max5800/k-fin-ui/compare/v1.20.0...v1.20.1) (2026-06-01)
 
 
