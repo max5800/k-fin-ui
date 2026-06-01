@@ -2,6 +2,12 @@
 
 Frontend for [k-fin](https://github.com/max5800/k-fin) — React 19 + TypeScript + Vite.
 
+<p align="center">
+  <a href="https://max5800.github.io/k-fin-ui/"><strong>Try the live mock demo</strong></a>
+  <br/>
+  <sub>Runs fully in your browser with fake finance data. No backend or credentials required.</sub>
+</p>
+
 > A personal project, not a finished product. I run it daily against my own k-fin backend and iterate from real usage — features land when I miss them, not on a public roadmap. It works well enough that I trust it with my own finances; whether that bar is high enough for you is your call. No guarantees, no support.
 
 **Companion repo:** [k-fin](https://github.com/max5800/k-fin) — the backend this UI talks to (Comdirect connector, Finance API, normalization pipeline).
@@ -47,6 +53,8 @@ Frontend for [k-fin](https://github.com/max5800/k-fin) — React 19 + TypeScript
    Runs on [http://localhost:3000](http://localhost:3000).
 
 ## Static demo
+
+Live demo: [https://max5800.github.io/k-fin-ui/](https://max5800.github.io/k-fin-ui/)
 
 The UI can run as a backend-less public demo. Set `VITE_DEMO_MODE=true` during
 the Vite build and every API call is answered from browser-local mock data.
