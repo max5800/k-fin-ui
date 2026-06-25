@@ -26,7 +26,7 @@ export default function MainLayout() {
     <div className="min-h-screen bg-background text-on-surface font-sans antialiased overflow-hidden">
       <Sidebar />
 
-      <main className="pl-64 min-h-screen">
+      <main className="min-h-screen md:pl-64">
         <TopBar title={viewData?.title} subtitle={viewData?.subtitle} />
         <div className="h-full">
           <Outlet />

@@ -117,7 +117,7 @@ describe('Portfolio multi-depot', () => {
     depotsMock = oneDepot;
     renderPortfolio();
     expect(screen.queryByRole('tablist', { name: /depot-auswahl/i })).not.toBeInTheDocument();
-    expect(screen.getByText('Hauptdepot')).toBeInTheDocument();
+    expect(screen.getAllByText('Hauptdepot').length).toBeGreaterThan(0);
   });
 
   it('renders tabs for "Alle Depots" + each depot when there are multiple', () => {
@@ -132,8 +132,8 @@ describe('Portfolio multi-depot', () => {
   it('shows positions from all depots by default with weight_pct re-computed', () => {
     depotsMock = twoDepots;
     renderPortfolio();
-    expect(screen.getByText('Instrument DE000ABC123')).toBeInTheDocument();
-    expect(screen.getByText('Instrument DE000XYZ789')).toBeInTheDocument();
+    expect(screen.getAllByText('Instrument DE000ABC123').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Instrument DE000XYZ789').length).toBeGreaterThan(0);
     // 60 of 100 total = 60.0 %, 40 of 100 = 40.0 %
     expect(screen.getByText('60,0 %')).toBeInTheDocument();
     expect(screen.getByText('40,0 %')).toBeInTheDocument();
@@ -145,7 +145,7 @@ describe('Portfolio multi-depot', () => {
     renderPortfolio();
     await user.click(screen.getByRole('tab', { name: 'Depot 2' }));
     expect(screen.queryByText('Instrument DE000ABC123')).not.toBeInTheDocument();
-    expect(screen.getByText('Instrument DE000XYZ789')).toBeInTheDocument();
+    expect(screen.getAllByText('Instrument DE000XYZ789').length).toBeGreaterThan(0);
   });
 
   it('opens the drill-down panel when a position row is clicked', async () => {

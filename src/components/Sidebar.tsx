@@ -47,7 +47,7 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="h-screen w-64 fixed left-0 top-0 border-r border-white/10 bg-surface-container-low flex flex-col py-8 px-4 font-headline antialiased z-50">
+    <aside className="h-screen w-64 fixed left-0 top-0 border-r border-white/10 bg-surface-container-low hidden md:flex flex-col py-8 px-4 font-headline antialiased z-50">
       <div className="mb-10 px-4">
         <h1 className="text-2xl font-bold tracking-tighter text-primary uppercase">k-fin</h1>
       </div>

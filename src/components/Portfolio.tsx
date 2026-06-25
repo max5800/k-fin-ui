@@ -4,7 +4,15 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   BadgeDollarSign,
+  ChevronDown,
+  Home,
   LineChart,
+  Newspaper,
+  PieChart,
+  Plus,
+  Search,
+  Settings,
+  SlidersHorizontal,
   TrendingUp,
   Wallet,
 } from 'lucide-react';
@@ -23,7 +31,13 @@ import PositionDetailPanel from './PositionDetailPanel';
 const ALL_DEPOTS = 'all' as const;
 type DepotSelection = typeof ALL_DEPOTS | string;
 
-const RANGES: PerformanceRange[] = ['1D', '1W', '1M', '1Y', 'MAX'];
+const RANGES: { label: string; value: PerformanceRange }[] = [
+  { label: 'Heute', value: '1D' },
+  { label: '7T', value: '1W' },
+  { label: '30T', value: '1M' },
+  { label: '1J', value: '1Y' },
+  { label: 'Max', value: 'MAX' },
+];
 
 const ALLOCATION_COLORS = ['#44d8f1', '#00bcd4', '#f4bd5f', '#869396', '#a1efff'];
 
@@ -90,29 +104,120 @@ export default function Portfolio() {
 
   const dailyPositive = (summary?.daily_pnl_abs ?? 0) >= 0;
   const totalPositive = (summary?.total_pnl_abs ?? 0) >= 0;
+  const assetClassCount = allocation?.length ?? 0;
+  const currency = summary ? portfolioCurrency(depots, visiblePositions) : 'EUR';
+  const topMovers = [...visiblePositions]
+    .sort((a, b) => Math.abs(b.daily_pnl_rel) - Math.abs(a.daily_pnl_rel))
+    .slice(0, 3);
 
   return (
-    <div className="pt-28 px-8 pb-12 overflow-y-auto h-screen space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+    <div className="pt-24 px-4 md:px-8 pb-28 md:pb-12 overflow-y-auto h-screen space-y-8">
+      <motion.section
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mx-auto w-full max-w-6xl"
+      >
+        <div className="flex items-center justify-between gap-3 mb-4">
+          <button
+            type="button"
+            className="w-12 h-12 rounded-full bg-surface-container-low border border-white/10 flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary/40 transition-colors"
+            aria-label="Profil"
+          >
+            <Wallet className="w-5 h-5" />
+          </button>
+          <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
+            <button
+              type="button"
+              className="w-12 h-12 rounded-xl bg-surface-container-low border border-white/10 flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary/40 transition-colors"
+              aria-label="Portfolio durchsuchen"
+            >
+              <Search className="w-5 h-5" />
+            </button>
+            <button
+              type="button"
+              className="min-w-0 max-w-[16rem] h-12 px-4 rounded-xl bg-surface-container-low border border-white/10 flex items-center gap-2 text-on-surface font-headline font-bold hover:border-primary/40 transition-colors"
+              aria-label="Aktuelles Portfolio"
+            >
+              <span className="truncate">{portfolioTitle(depots, selectedDepot)}</span>
+              <ChevronDown className="w-4 h-4 shrink-0 text-on-surface-variant" />
+            </button>
+            <button
+              type="button"
+              className="w-12 h-12 rounded-xl bg-surface-container-low border border-white/10 flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary/40 transition-colors"
+              aria-label="Portfolio-Einstellungen"
+            >
+              <Settings className="w-5 h-5" />
+            </button>
+          </div>
+        </div>
+
+        <div className="flex gap-2 mb-6">
+          <div
+            className="grid flex-1 grid-cols-5 rounded-xl bg-surface-container-high p-1"
+            role="tablist"
+            aria-label="Zeitraum"
+          >
+            {RANGES.map((r) => (
+              <button
+                key={r.value}
+                type="button"
+                onClick={() => setRange(r.value)}
+                className={`h-11 rounded-lg text-sm font-bold transition-colors ${
+                  r.value === range
+                    ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+                role="tab"
+                aria-selected={r.value === range}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+          <button
+            type="button"
+            className="w-14 rounded-xl bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors"
+            aria-label="Portfolio filtern"
+          >
+            <SlidersHorizontal className="w-5 h-5" />
+          </button>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-surface-container-low px-5 py-8 md:px-10 md:py-10">
+          <div className="mx-auto max-w-3xl">
+            <PortfolioArc
+              value={summary?.total_value ?? 0}
+              pnlAbs={summary?.total_pnl_abs ?? 0}
+              pnlRel={summary?.total_pnl_rel ?? 0}
+              currency={currency}
+              assetClassCount={assetClassCount}
+              positionsCount={summary?.positions_count ?? visiblePositions.length}
+              pending={isSummaryPending}
+            />
+          </div>
+        </div>
+      </motion.section>
+
+      <section className="mx-auto grid w-full max-w-6xl grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <KpiCard
-          label="Gesamtwert"
-          value={summary ? formatCurrency(summary.total_value) : '—'}
-          hint={summary ? `${summary.positions_count} Positionen` : ''}
+          label="Investiert"
+          value={summary ? formatCurrency(summary.total_purchase_value, currency) : '—'}
+          hint={summary ? `${summary.depots_count} Depot${summary.depots_count === 1 ? '' : 's'}` : ''}
           icon={Wallet}
           tone="neutral"
           pending={isSummaryPending}
         />
         <KpiCard
           label="G/V Heute"
-          value={summary ? formatCurrency(summary.daily_pnl_abs) : '—'}
+          value={summary ? formatCurrency(summary.daily_pnl_abs, currency) : '—'}
           hint={summary ? formatPercent(summary.daily_pnl_rel, 2) : ''}
           icon={dailyPositive ? ArrowUpRight : ArrowDownRight}
           tone={dailyPositive ? 'primary' : 'danger'}
           pending={isSummaryPending}
         />
         <KpiCard
-          label="G/V Gesamt"
-          value={summary ? formatCurrency(summary.total_pnl_abs) : '—'}
+          label="Gesamtrendite"
+          value={summary ? formatCurrency(summary.total_pnl_abs, currency) : '—'}
           hint={summary ? formatPercent(summary.total_pnl_rel, 1) : ''}
           icon={LineChart}
           tone={totalPositive ? 'primary' : 'danger'}
@@ -126,9 +231,9 @@ export default function Portfolio() {
           tone="gold"
           pending={isSummaryPending}
         />
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <section className="mx-auto grid w-full max-w-6xl grid-cols-1 xl:grid-cols-3 gap-6">
         <motion.div
           initial={{ opacity: 0, x: -16 }}
           animate={{ opacity: 1, x: 0 }}
@@ -139,18 +244,18 @@ export default function Portfolio() {
               <h3 className="text-xl font-headline font-bold text-on-surface">Performance</h3>
               <p className="text-sm text-on-surface-variant">Depotwert im Zeitverlauf</p>
             </div>
-            <div className="flex gap-1 bg-surface-container-high rounded-lg p-1">
+            <div className="hidden sm:flex gap-1 bg-surface-container-high rounded-lg p-1">
               {RANGES.map((r) => (
                 <button
-                  key={r}
-                  onClick={() => setRange(r)}
+                  key={r.value}
+                  onClick={() => setRange(r.value)}
                   className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
-                    r === range
+                    r.value === range
                       ? 'bg-primary text-on-primary'
                       : 'text-on-surface-variant hover:text-on-surface'
                   }`}
                 >
-                  {r}
+                  {r.label}
                 </button>
               ))}
             </div>
@@ -222,12 +327,12 @@ export default function Portfolio() {
             </p>
           )}
         </motion.div>
-      </div>
+      </section>
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-surface-container-low rounded-2xl border border-white/5 overflow-hidden"
+        className="mx-auto w-full max-w-6xl bg-surface-container-low rounded-2xl border border-white/5 overflow-hidden"
       >
         <div className="p-6 border-b border-white/5 flex justify-between items-center">
           <div>
@@ -257,6 +362,63 @@ export default function Portfolio() {
           }
         />
       </motion.div>
+
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mx-auto w-full max-w-6xl rounded-2xl border border-white/5 bg-surface-container-low p-6"
+      >
+        <div className="flex items-center justify-between gap-4 mb-5">
+          <h3 className="font-headline font-bold text-on-surface text-xl">Deine Aktivitäten</h3>
+          <button
+            type="button"
+            className="w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-primary-container transition-colors"
+            aria-label="Aktivität hinzufügen"
+          >
+            <Plus className="w-6 h-6" />
+          </button>
+        </div>
+        {topMovers.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {topMovers.map((p) => (
+              <button
+                key={`${p.depot_id}:${p.instrument.isin}:activity`}
+                type="button"
+                onClick={() => setDrilldown(p)}
+                className="text-left rounded-xl bg-surface-container p-4 border border-white/5 hover:border-primary/40 transition-colors"
+              >
+                <p className="text-xs text-on-surface-variant mb-2">Top-Bewegung</p>
+                <p className="font-headline font-bold text-on-surface truncate">
+                  {p.instrument.name || p.instrument.isin}
+                </p>
+                <p
+                  className={`mt-3 font-headline font-extrabold tabular-nums ${
+                    p.daily_pnl_abs >= 0 ? 'text-primary' : 'text-error'
+                  }`}
+                >
+                  {p.daily_pnl_abs >= 0 ? '+' : ''}
+                  {formatPercent(p.daily_pnl_rel, 2)}
+                </p>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <p className="py-8 text-center text-sm text-on-surface-variant">
+            Noch keine Portfolio-Aktivitäten. Nach dem nächsten Sync erscheinen Bewegungen hier.
+          </p>
+        )}
+      </motion.section>
+
+      <nav
+        className="fixed bottom-4 left-4 right-4 z-40 grid grid-cols-5 rounded-[2rem] border border-white/10 bg-surface-container-lowest/95 p-2 shadow-2xl backdrop-blur md:hidden"
+        aria-label="Portfolio Navigation"
+      >
+        <MobileNavButton icon={Home} label="Home" active />
+        <MobileNavButton icon={TrendingUp} label="Holdings" />
+        <MobileNavButton icon={BadgeDollarSign} label="Dividenden" />
+        <MobileNavButton icon={PieChart} label="Analyse" />
+        <MobileNavButton icon={Newspaper} label="News" />
+      </nav>
 
       <PositionDetailPanel
         position={drilldownLive}
@@ -322,6 +484,113 @@ function KpiCard({ label, value, hint, icon: Icon, tone, pending }: KpiCardProps
       )}
       <p className="text-xs mt-2 text-on-surface-variant font-medium">{hint}</p>
     </motion.div>
+  );
+}
+
+function PortfolioArc({
+  value,
+  pnlAbs,
+  pnlRel,
+  currency,
+  assetClassCount,
+  positionsCount,
+  pending,
+}: {
+  value: number;
+  pnlAbs: number;
+  pnlRel: number;
+  currency: string;
+  assetClassCount: number;
+  positionsCount: number;
+  pending: boolean;
+}) {
+  const positive = pnlAbs >= 0;
+  const pnlIntensity = Math.min(Math.max(Math.abs(pnlRel) / 30, 0.08), 1);
+  const circumference = 314;
+  const strokeDashoffset = circumference * (1 - pnlIntensity);
+
+  return (
+    <div className="relative mx-auto flex aspect-[1.45/1] w-full max-w-[42rem] items-end justify-center">
+      <svg
+        className="absolute inset-x-0 bottom-0 h-full w-full"
+        viewBox="0 0 420 240"
+        role="img"
+        aria-label="Portfolio Performance"
+      >
+        <path
+          d="M40 210 A170 170 0 0 1 380 210"
+          fill="none"
+          stroke="#273452"
+          strokeLinecap="butt"
+          strokeWidth="34"
+        />
+        <path
+          d="M40 210 A170 170 0 0 1 380 210"
+          fill="none"
+          stroke={positive ? '#44d8f1' : '#ffb4ab'}
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="butt"
+          strokeWidth="34"
+        />
+      </svg>
+
+      <div className="relative z-10 mb-4 flex w-full max-w-md flex-col items-center px-4 text-center">
+        {pending ? (
+          <div className="mb-4 h-12 w-44 animate-pulse rounded-xl bg-white/5" />
+        ) : (
+          <p className="mb-3 break-words text-4xl font-headline font-extrabold tabular-nums text-on-surface md:text-5xl">
+            {formatCurrency(value, currency)}
+          </p>
+        )}
+        <div className="mb-4 h-px w-full max-w-xs bg-white/10" />
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <span
+            className={`rounded-lg px-3 py-1 text-sm font-headline font-bold tabular-nums ${
+              positive ? 'bg-primary/15 text-primary' : 'bg-error/15 text-error'
+            }`}
+          >
+            {pnlAbs >= 0 ? '+' : ''}
+            {formatCurrency(pnlAbs, currency)}
+          </span>
+          <span
+            className={`rounded-lg px-3 py-1 text-sm font-headline font-bold tabular-nums ${
+              positive ? 'bg-primary/15 text-primary' : 'bg-error/15 text-error'
+            }`}
+          >
+            {pnlRel >= 0 ? '+' : ''}
+            {formatPercent(pnlRel, 2)}
+          </span>
+        </div>
+        <p className="mt-5 text-sm text-on-surface-variant">
+          {assetClassCount} Assetklassen • {positionsCount} Holdings • {currency}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+function MobileNavButton({
+  icon: Icon,
+  label,
+  active = false,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-3xl px-1 py-2 text-[11px] font-bold transition-colors ${
+        active
+          ? 'bg-surface-container-high text-primary'
+          : 'text-on-surface hover:text-primary'
+      }`}
+    >
+      <Icon className="h-5 w-5" />
+      <span className="max-w-full truncate">{label}</span>
+    </button>
   );
 }
 
@@ -449,6 +718,24 @@ function PositionsTable({
 function depotLabel(d: Depot, idx: number): string {
   const t = d.depot_type?.trim();
   return t ? t : `Depot ${idx + 1}`;
+}
+
+function portfolioTitle(
+  depots: Depot[] | undefined,
+  selected: DepotSelection,
+): string {
+  if (!depots || depots.length === 0) return 'Mein Portfolio';
+  if (selected === ALL_DEPOTS) return depots.length > 1 ? 'Alle Portfolios' : depotLabel(depots[0], 0);
+  const idx = depots.findIndex((d) => d.depot_id === selected);
+  return idx >= 0 ? depotLabel(depots[idx], idx) : 'Mein Portfolio';
+}
+
+function portfolioCurrency(
+  depots: Depot[] | undefined,
+  positions: Position[],
+): string {
+  const depotCurrency = depots?.find((d) => d.currency)?.currency;
+  return depotCurrency ?? positions.find((p) => p.currency)?.currency ?? 'EUR';
 }
 
 function bestandslisteSubtitle(
