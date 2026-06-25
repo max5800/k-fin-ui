@@ -13,6 +13,8 @@ import type {
   MonthlySummary,
   PaginatedResponse,
   PendingResponse,
+  PortfolioActivity,
+  Position,
   Run,
   Transaction,
 } from '../api/types';
@@ -223,6 +225,7 @@ function handleDemoRequest(
   if (method === 'POST' && path === '/import/paypal-csv') return importResult(state, 'paypal');
   if (method === 'POST' && path === '/import/santander-pdf') return { statements: 1, parsed: 3, inserted: 0, duplicates: 3, normalized: state.transactions.length, errors: [] };
 
+  if (method === 'GET' && path === '/portfolio/home') return portfolioHome(state, params);
   if (method === 'GET' && path === '/portfolio/summary') return portfolioSummary(state);
   if (method === 'GET' && path === '/portfolio/allocation') return clone(state.allocation);
   if (method === 'GET' && path === '/portfolio/performance') return clone(state.performance);
@@ -676,6 +679,35 @@ function portfolioSummary(state: DemoState) {
     positions_count: positions.length,
     depots_count: state.depots.length,
     last_synced_at: state.depots[0]?.last_synced_at ?? null,
+  };
+}
+
+function portfolioHome(state: DemoState, params: Params) {
+  const activityLimit = numberParam(params, 'activity_limit', 5);
+  const positions = Object.values(state.positionsByDepot).flat();
+  const byIsin = new Map(positions.map((p) => [p.instrument.isin, p]));
+  const activities = Object.values(state.depotTransactionsByDepot)
+    .flat()
+    .sort((a, b) => b.booking_date.localeCompare(a.booking_date))
+    .slice(0, activityLimit)
+    .map((tx) => portfolioActivity(tx, byIsin.get(tx.isin ?? '')));
+
+  return {
+    summary: portfolioSummary(state),
+    allocation: clone(state.allocation),
+    performance: clone(state.performance),
+    activities,
+  };
+}
+
+function portfolioActivity(
+  tx: DepotTransaction,
+  position: Position | undefined,
+): PortfolioActivity {
+  return {
+    ...tx,
+    instrument_name: position?.instrument.name ?? null,
+    instrument_type: position?.instrument.instrument_type ?? null,
   };
 }
 

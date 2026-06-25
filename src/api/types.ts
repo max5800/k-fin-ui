@@ -373,6 +373,20 @@ export type DepotTransaction = {
   currency: string;
 };
 
+export type PortfolioActivity = {
+  transaction_id: string;
+  depot_id: string;
+  isin: string | null;
+  instrument_name: string | null;
+  instrument_type: string | null;
+  booking_date: string;
+  transaction_type: DepotTransactionType;
+  quantity: number;
+  price: number;
+  amount: number;
+  currency: string;
+};
+
 export type PortfolioSummary = {
   total_value: number;
   total_purchase_value: number;
@@ -399,3 +413,10 @@ export type PerformancePoint = {
 };
 
 export type PerformanceRange = '1D' | '1W' | '1M' | '1Y' | 'MAX';
+
+export type PortfolioHome = {
+  summary: PortfolioSummary;
+  allocation: AllocationBucket[];
+  performance: PerformancePoint[];
+  activities: PortfolioActivity[];
+};

@@ -20,12 +20,16 @@ import {
 import {
   useAllPositions,
   useDepots,
-  usePortfolioAllocation,
-  usePortfolioPerformance,
-  usePortfolioSummary,
+  usePortfolioHome,
 } from '../api/portfolio';
 import { formatCurrency } from '../lib/format';
-import type { Depot, PerformancePoint, PerformanceRange, Position } from '../api/types';
+import type {
+  Depot,
+  PerformancePoint,
+  PerformanceRange,
+  PortfolioActivity,
+  Position,
+} from '../api/types';
 import PositionDetailPanel from './PositionDetailPanel';
 
 const ALL_DEPOTS = 'all' as const;
@@ -44,6 +48,26 @@ const ALLOCATION_COLORS = ['#44d8f1', '#00bcd4', '#f4bd5f', '#869396', '#a1efff'
 function formatPercent(value: number, digits = 1): string {
   const abs = value.toFixed(digits).replace('.', ',');
   return `${abs} %`;
+}
+
+function formatDateShort(value: string): string {
+  return new Intl.DateTimeFormat('de-DE', {
+    day: '2-digit',
+    month: '2-digit',
+  }).format(new Date(value));
+}
+
+function formatActivityType(type: PortfolioActivity['transaction_type']): string {
+  switch (type) {
+    case 'BUY':
+      return 'Kauf';
+    case 'SELL':
+      return 'Verkauf';
+    case 'DIVIDEND':
+      return 'Dividende';
+    default:
+      return 'Aktivität';
+  }
 }
 
 function buildChartPaths(series: PerformancePoint[], width = 800, height = 200) {
@@ -72,9 +96,11 @@ export default function Portfolio() {
   // values immediately without waiting for a re-fetch.
   const [drilldown, setDrilldown] = useState<Position | null>(null);
 
-  const { data: summary, isPending: isSummaryPending } = usePortfolioSummary();
-  const { data: allocation } = usePortfolioAllocation();
-  const { data: performance } = usePortfolioPerformance(range);
+  const { data: home, isPending: isHomePending } = usePortfolioHome(range);
+  const summary = home?.summary;
+  const allocation = home?.allocation;
+  const performance = home?.performance;
+  const activities = home?.activities ?? [];
   const { data: depots } = useDepots();
 
   const { byDepotId, isPending: isPositionsPending } = useAllPositions(depots);
@@ -106,10 +132,6 @@ export default function Portfolio() {
   const totalPositive = (summary?.total_pnl_abs ?? 0) >= 0;
   const assetClassCount = allocation?.length ?? 0;
   const currency = summary ? portfolioCurrency(depots, visiblePositions) : 'EUR';
-  const topMovers = [...visiblePositions]
-    .sort((a, b) => Math.abs(b.daily_pnl_rel) - Math.abs(a.daily_pnl_rel))
-    .slice(0, 3);
-
   return (
     <div className="pt-24 px-4 md:px-8 pb-28 md:pb-12 overflow-y-auto h-screen space-y-8">
       <motion.section
@@ -192,7 +214,7 @@ export default function Portfolio() {
               currency={currency}
               assetClassCount={assetClassCount}
               positionsCount={summary?.positions_count ?? visiblePositions.length}
-              pending={isSummaryPending}
+              pending={isHomePending}
             />
           </div>
         </div>
@@ -205,7 +227,7 @@ export default function Portfolio() {
           hint={summary ? `${summary.depots_count} Depot${summary.depots_count === 1 ? '' : 's'}` : ''}
           icon={Wallet}
           tone="neutral"
-          pending={isSummaryPending}
+          pending={isHomePending}
         />
         <KpiCard
           label="G/V Heute"
@@ -213,7 +235,7 @@ export default function Portfolio() {
           hint={summary ? formatPercent(summary.daily_pnl_rel, 2) : ''}
           icon={dailyPositive ? ArrowUpRight : ArrowDownRight}
           tone={dailyPositive ? 'primary' : 'danger'}
-          pending={isSummaryPending}
+          pending={isHomePending}
         />
         <KpiCard
           label="Gesamtrendite"
@@ -221,7 +243,7 @@ export default function Portfolio() {
           hint={summary ? formatPercent(summary.total_pnl_rel, 1) : ''}
           icon={LineChart}
           tone={totalPositive ? 'primary' : 'danger'}
-          pending={isSummaryPending}
+          pending={isHomePending}
         />
         <KpiCard
           label="Dividendenrendite"
@@ -229,7 +251,7 @@ export default function Portfolio() {
           hint="Letzte 12 Monate"
           icon={BadgeDollarSign}
           tone="gold"
-          pending={isSummaryPending}
+          pending={isHomePending}
         />
       </section>
 
@@ -378,28 +400,31 @@ export default function Portfolio() {
             <Plus className="w-6 h-6" />
           </button>
         </div>
-        {topMovers.length > 0 ? (
+        {activities.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-            {topMovers.map((p) => (
-              <button
-                key={`${p.depot_id}:${p.instrument.isin}:activity`}
-                type="button"
-                onClick={() => setDrilldown(p)}
+            {activities.slice(0, 3).map((activity) => (
+              <div
+                key={activity.transaction_id}
                 className="text-left rounded-xl bg-surface-container p-4 border border-white/5 hover:border-primary/40 transition-colors"
               >
-                <p className="text-xs text-on-surface-variant mb-2">Top-Bewegung</p>
+                <p className="text-xs text-on-surface-variant mb-2">
+                  {formatActivityType(activity.transaction_type)}
+                </p>
                 <p className="font-headline font-bold text-on-surface truncate">
-                  {p.instrument.name || p.instrument.isin}
+                  {activity.instrument_name || activity.isin || 'Depotbewegung'}
                 </p>
                 <p
                   className={`mt-3 font-headline font-extrabold tabular-nums ${
-                    p.daily_pnl_abs >= 0 ? 'text-primary' : 'text-error'
+                    activity.amount >= 0 ? 'text-primary' : 'text-error'
                   }`}
                 >
-                  {p.daily_pnl_abs >= 0 ? '+' : ''}
-                  {formatPercent(p.daily_pnl_rel, 2)}
+                  {activity.amount >= 0 ? '+' : ''}
+                  {formatCurrency(activity.amount, activity.currency)}
                 </p>
-              </button>
+                <p className="mt-2 text-xs text-on-surface-variant">
+                  {formatDateShort(activity.booking_date)}
+                </p>
+              </div>
             ))}
           </div>
         ) : (

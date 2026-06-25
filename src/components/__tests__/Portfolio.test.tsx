@@ -80,9 +80,15 @@ const positionsByDepot = {
 let depotsMock: Depot[] = oneDepot;
 
 vi.mock('../../api/portfolio', () => ({
-  usePortfolioSummary: () => ({ data: summary, isPending: false }),
-  usePortfolioAllocation: () => ({ data: [] }),
-  usePortfolioPerformance: () => ({ data: [] }),
+  usePortfolioHome: () => ({
+    data: {
+      summary,
+      allocation: [],
+      performance: [],
+      activities: [],
+    },
+    isPending: false,
+  }),
   useDepots: () => ({ data: depotsMock }),
   useAllPositions: (depots: Depot[] | undefined) => ({
     byDepotId: Object.fromEntries(

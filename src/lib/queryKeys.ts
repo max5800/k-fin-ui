@@ -81,6 +81,7 @@ export const qk = {
     backfillRun: (id: string | null) => ['backfill-run', id] as const,
   },
   portfolio: {
+    home: (range: string) => ['portfolio', 'home', range] as const,
     summary: ['portfolio', 'summary'] as const,
     allocation: ['portfolio', 'allocation'] as const,
     performance: (range: string) => ['portfolio', 'performance', range] as const,
