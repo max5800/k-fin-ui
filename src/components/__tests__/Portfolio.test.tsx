@@ -3,7 +3,7 @@ import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import type { Depot, Position } from '../../api/types';
+import type { Depot, PortfolioActivity, Position } from '../../api/types';
 import Portfolio from '../Portfolio';
 
 const summary = {
@@ -77,6 +77,35 @@ const positionsByDepot = {
   D2: [makePosition('D2', 'DE000XYZ789', 40, 100)],
 };
 
+const activities: PortfolioActivity[] = [
+  {
+    transaction_id: 'BUY-1',
+    depot_id: 'D1',
+    isin: 'DE000ABC123',
+    instrument_name: 'Instrument DE000ABC123',
+    instrument_type: 'SHARE',
+    booking_date: '2026-06-20',
+    transaction_type: 'BUY',
+    quantity: 2,
+    price: 30,
+    amount: 60,
+    currency: 'EUR',
+  },
+  {
+    transaction_id: 'DIV-1',
+    depot_id: 'D1',
+    isin: 'DE000ABC123',
+    instrument_name: 'Instrument DE000ABC123',
+    instrument_type: 'SHARE',
+    booking_date: '2026-06-21',
+    transaction_type: 'DIVIDEND',
+    quantity: 0,
+    price: 0,
+    amount: 5,
+    currency: 'EUR',
+  },
+];
+
 let depotsMock: Depot[] = oneDepot;
 
 vi.mock('../../api/portfolio', () => ({
@@ -85,7 +114,7 @@ vi.mock('../../api/portfolio', () => ({
       summary,
       allocation: [],
       performance: [],
-      activities: [],
+      activities,
     },
     isPending: false,
   }),
@@ -150,8 +179,12 @@ describe('Portfolio multi-depot', () => {
     const user = userEvent.setup();
     renderPortfolio();
     await user.click(screen.getByRole('tab', { name: 'Depot 2' }));
-    expect(screen.queryByText('Instrument DE000ABC123')).not.toBeInTheDocument();
-    expect(screen.getAllByText('Instrument DE000XYZ789').length).toBeGreaterThan(0);
+    expect(
+      screen.queryByRole('button', { name: /details:.*Instrument DE000ABC123/i }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.getByRole('button', { name: /details:.*Instrument DE000XYZ789/i }),
+    ).toBeInTheDocument();
   });
 
   it('opens the drill-down panel when a position row is clicked', async () => {
@@ -169,6 +202,16 @@ describe('Portfolio multi-depot', () => {
     expect(within(dialog).getByRole('button', { name: /speichern/i })).toBeInTheDocument();
     // The dialog title carries the position name.
     expect(dialog).toHaveAccessibleName(/Instrument DE000ABC123/);
+  });
+
+  it('renders typed activities without treating buys as positive gains', () => {
+    depotsMock = oneDepot;
+    renderPortfolio();
+    const activitiesRegion = screen.getByRole('region', { name: /deine aktivitäten/i });
+    expect(within(activitiesRegion).getByText('Kauf')).toBeInTheDocument();
+    expect(within(activitiesRegion).getByText('Dividende')).toBeInTheDocument();
+    expect(within(activitiesRegion).getByText('60,00 €')).toBeInTheDocument();
+    expect(within(activitiesRegion).getByText('+5,00 €')).toBeInTheDocument();
   });
 
   it('closes the drill-down panel via the close button', async () => {

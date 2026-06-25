@@ -47,12 +47,55 @@ export default function Sidebar() {
   };
 
   return (
-    <aside className="h-screen w-64 fixed left-0 top-0 border-r border-white/10 bg-surface-container-low hidden md:flex flex-col py-8 px-4 font-headline antialiased z-50">
-      <div className="mb-10 px-4">
-        <h1 className="text-2xl font-bold tracking-tighter text-primary uppercase">k-fin</h1>
-      </div>
+    <>
+      <aside className="h-screen w-64 fixed left-0 top-0 border-r border-white/10 bg-surface-container-low hidden md:flex flex-col py-8 px-4 font-headline antialiased z-50">
+        <div className="mb-10 px-4">
+          <h1 className="text-2xl font-bold tracking-tighter text-primary uppercase">k-fin</h1>
+        </div>
 
-      <nav className="flex-1 space-y-1">
+        <nav className="flex-1 space-y-1">
+          {menuItems.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.to}
+                to={item.to}
+                end={item.end}
+                className={({ isActive }) =>
+                  `w-full flex items-center gap-3 py-3 px-4 rounded-lg transition-all duration-200 ${
+                    isActive
+                      ? 'text-primary font-semibold border-r-2 border-primary bg-primary/5'
+                      : 'text-on-surface-variant hover:text-primary hover:bg-surface-container-high'
+                  }`
+                }
+              >
+                <Icon className="w-5 h-5" />
+                <span className="text-sm flex-1">{item.label}</span>
+                {item.badge && item.badge > 0 ? (
+                  <span className="text-[10px] font-bold bg-primary/20 text-primary px-2 py-0.5 rounded-full tabular-nums">
+                    {item.badge}
+                  </span>
+                ) : null}
+              </NavLink>
+            );
+          })}
+        </nav>
+
+        <div className="mt-auto pt-6 border-t border-white/5 px-4">
+          <button
+            onClick={handleLogout}
+            className="flex items-center gap-3 py-2 text-on-surface-variant hover:text-primary transition-colors w-full text-left"
+          >
+            <LogOut className="w-5 h-5" />
+            <span className="text-sm">Abmelden</span>
+          </button>
+        </div>
+      </aside>
+
+      <nav
+        className="fixed bottom-0 left-0 right-0 z-50 flex gap-1 overflow-x-auto border-t border-white/10 bg-surface-container-lowest/95 px-2 py-2 shadow-2xl backdrop-blur md:hidden"
+        aria-label="Hauptnavigation"
+      >
         {menuItems.map((item) => {
           const Icon = item.icon;
           return (
@@ -61,34 +104,32 @@ export default function Sidebar() {
               to={item.to}
               end={item.end}
               className={({ isActive }) =>
-                `w-full flex items-center gap-3 py-3 px-4 rounded-lg transition-all duration-200 ${
+                `relative flex min-w-[4.75rem] flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold transition-colors ${
                   isActive
-                    ? 'text-primary font-semibold border-r-2 border-primary bg-primary/5'
-                    : 'text-on-surface-variant hover:text-primary hover:bg-surface-container-high'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-on-surface-variant hover:text-on-surface'
                 }`
               }
             >
-              <Icon className="w-5 h-5" />
-              <span className="text-sm flex-1">{item.label}</span>
+              <Icon className="h-5 w-5" />
+              <span className="max-w-full truncate">{item.label}</span>
               {item.badge && item.badge > 0 ? (
-                <span className="text-[10px] font-bold bg-primary/20 text-primary px-2 py-0.5 rounded-full tabular-nums">
+                <span className="absolute right-2 top-1 rounded-full bg-primary px-1.5 text-[9px] font-bold text-on-primary">
                   {item.badge}
                 </span>
               ) : null}
             </NavLink>
           );
         })}
-      </nav>
-
-      <div className="mt-auto pt-6 border-t border-white/5 px-4">
         <button
+          type="button"
           onClick={handleLogout}
-          className="flex items-center gap-3 py-2 text-on-surface-variant hover:text-primary transition-colors w-full text-left"
+          className="flex min-w-[4.75rem] flex-col items-center justify-center gap-1 rounded-xl px-2 py-2 text-[11px] font-semibold text-on-surface-variant hover:text-on-surface"
         >
-          <LogOut className="w-5 h-5" />
-          <span className="text-sm">Abmelden</span>
+          <LogOut className="h-5 w-5" />
+          <span>Abmelden</span>
         </button>
-      </div>
-    </aside>
+      </nav>
+    </>
   );
 }

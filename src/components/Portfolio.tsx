@@ -4,15 +4,7 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   BadgeDollarSign,
-  ChevronDown,
-  Home,
   LineChart,
-  Newspaper,
-  PieChart,
-  Plus,
-  Search,
-  Settings,
-  SlidersHorizontal,
   TrendingUp,
   Wallet,
 } from 'lucide-react';
@@ -22,7 +14,7 @@ import {
   useDepots,
   usePortfolioHome,
 } from '../api/portfolio';
-import { formatCurrency } from '../lib/format';
+import { formatCurrency, formatDate } from '../lib/format';
 import type {
   Depot,
   PerformancePoint,
@@ -51,10 +43,7 @@ function formatPercent(value: number, digits = 1): string {
 }
 
 function formatDateShort(value: string): string {
-  return new Intl.DateTimeFormat('de-DE', {
-    day: '2-digit',
-    month: '2-digit',
-  }).format(new Date(value));
+  return formatDate(value, 'dd.MM.');
 }
 
 function formatActivityType(type: PortfolioActivity['transaction_type']): string {
@@ -68,6 +57,29 @@ function formatActivityType(type: PortfolioActivity['transaction_type']): string
     default:
       return 'Aktivität';
   }
+}
+
+function formatActivityAmount(activity: PortfolioActivity): string {
+  const amount = formatCurrency(Math.abs(activity.amount), activity.currency);
+  switch (activity.transaction_type) {
+    case 'BUY':
+      return amount;
+    case 'SELL':
+    case 'DIVIDEND':
+      return `+${amount}`;
+    default:
+      return activity.amount >= 0 ? `+${amount}` : `-${amount}`;
+  }
+}
+
+function activityAmountClass(activity: PortfolioActivity): string {
+  if (activity.transaction_type === 'DIVIDEND' || activity.transaction_type === 'SELL') {
+    return 'text-primary';
+  }
+  if (activity.transaction_type === 'BUY') {
+    return 'text-on-surface';
+  }
+  return activity.amount >= 0 ? 'text-primary' : 'text-error';
 }
 
 function buildChartPaths(series: PerformancePoint[], width = 800, height = 200) {
@@ -96,7 +108,7 @@ export default function Portfolio() {
   // values immediately without waiting for a re-fetch.
   const [drilldown, setDrilldown] = useState<Position | null>(null);
 
-  const { data: home, isPending: isHomePending } = usePortfolioHome(range);
+  const { data: home, isPending: isHomePending, isError: isHomeError } = usePortfolioHome(range);
   const summary = home?.summary;
   const allocation = home?.allocation;
   const performance = home?.performance;
@@ -139,39 +151,25 @@ export default function Portfolio() {
         animate={{ opacity: 1, y: 0 }}
         className="mx-auto w-full max-w-6xl"
       >
-        <div className="flex items-center justify-between gap-3 mb-4">
-          <button
-            type="button"
-            className="w-12 h-12 rounded-full bg-surface-container-low border border-white/10 flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary/40 transition-colors"
-            aria-label="Profil"
-          >
+        <div className="mb-4 flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-surface-container-low border border-white/10 flex items-center justify-center text-primary">
             <Wallet className="w-5 h-5" />
-          </button>
-          <div className="flex min-w-0 flex-1 items-center justify-end gap-2">
-            <button
-              type="button"
-              className="w-12 h-12 rounded-xl bg-surface-container-low border border-white/10 flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary/40 transition-colors"
-              aria-label="Portfolio durchsuchen"
-            >
-              <Search className="w-5 h-5" />
-            </button>
-            <button
-              type="button"
-              className="min-w-0 max-w-[16rem] h-12 px-4 rounded-xl bg-surface-container-low border border-white/10 flex items-center gap-2 text-on-surface font-headline font-bold hover:border-primary/40 transition-colors"
-              aria-label="Aktuelles Portfolio"
-            >
-              <span className="truncate">{portfolioTitle(depots, selectedDepot)}</span>
-              <ChevronDown className="w-4 h-4 shrink-0 text-on-surface-variant" />
-            </button>
-            <button
-              type="button"
-              className="w-12 h-12 rounded-xl bg-surface-container-low border border-white/10 flex items-center justify-center text-on-surface-variant hover:text-primary hover:border-primary/40 transition-colors"
-              aria-label="Portfolio-Einstellungen"
-            >
-              <Settings className="w-5 h-5" />
-            </button>
+          </div>
+          <div className="min-w-0">
+            <h2 className="truncate font-headline text-2xl font-extrabold text-on-surface">
+              Alle Depots
+            </h2>
+            <p className="text-sm text-on-surface-variant">
+              Home-Kennzahlen und Aktivitäten zeigen das Gesamtportfolio.
+            </p>
           </div>
         </div>
+
+        {isHomeError && (
+          <div className="mb-6 rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm text-error">
+            Portfolio-Home konnte nicht geladen werden. Bitte Backend-Deployment prüfen.
+          </div>
+        )}
 
         <div className="flex gap-2 mb-6">
           <div
@@ -196,13 +194,6 @@ export default function Portfolio() {
               </button>
             ))}
           </div>
-          <button
-            type="button"
-            className="w-14 rounded-xl bg-surface-container-high flex items-center justify-center text-on-surface-variant hover:text-primary transition-colors"
-            aria-label="Portfolio filtern"
-          >
-            <SlidersHorizontal className="w-5 h-5" />
-          </button>
         </div>
 
         <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-surface-container-low px-5 py-8 md:px-10 md:py-10">
@@ -386,19 +377,21 @@ export default function Portfolio() {
       </motion.div>
 
       <motion.section
+        aria-labelledby="portfolio-activities-heading"
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
         className="mx-auto w-full max-w-6xl rounded-2xl border border-white/5 bg-surface-container-low p-6"
       >
-        <div className="flex items-center justify-between gap-4 mb-5">
-          <h3 className="font-headline font-bold text-on-surface text-xl">Deine Aktivitäten</h3>
-          <button
-            type="button"
-            className="w-11 h-11 rounded-full bg-primary text-on-primary flex items-center justify-center hover:bg-primary-container transition-colors"
-            aria-label="Aktivität hinzufügen"
+        <div className="mb-5">
+          <h3
+            id="portfolio-activities-heading"
+            className="font-headline font-bold text-on-surface text-xl"
           >
-            <Plus className="w-6 h-6" />
-          </button>
+            Deine Aktivitäten
+          </h3>
+          <p className="text-xs text-on-surface-variant">
+            Letzte Depotbewegungen aus Käufen, Verkäufen und Dividenden.
+          </p>
         </div>
         {activities.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
@@ -414,12 +407,9 @@ export default function Portfolio() {
                   {activity.instrument_name || activity.isin || 'Depotbewegung'}
                 </p>
                 <p
-                  className={`mt-3 font-headline font-extrabold tabular-nums ${
-                    activity.amount >= 0 ? 'text-primary' : 'text-error'
-                  }`}
+                  className={`mt-3 font-headline font-extrabold tabular-nums ${activityAmountClass(activity)}`}
                 >
-                  {activity.amount >= 0 ? '+' : ''}
-                  {formatCurrency(activity.amount, activity.currency)}
+                  {formatActivityAmount(activity)}
                 </p>
                 <p className="mt-2 text-xs text-on-surface-variant">
                   {formatDateShort(activity.booking_date)}
@@ -433,17 +423,6 @@ export default function Portfolio() {
           </p>
         )}
       </motion.section>
-
-      <nav
-        className="fixed bottom-4 left-4 right-4 z-40 grid grid-cols-5 rounded-[2rem] border border-white/10 bg-surface-container-lowest/95 p-2 shadow-2xl backdrop-blur md:hidden"
-        aria-label="Portfolio Navigation"
-      >
-        <MobileNavButton icon={Home} label="Home" active />
-        <MobileNavButton icon={TrendingUp} label="Holdings" />
-        <MobileNavButton icon={BadgeDollarSign} label="Dividenden" />
-        <MobileNavButton icon={PieChart} label="Analyse" />
-        <MobileNavButton icon={Newspaper} label="News" />
-      </nav>
 
       <PositionDetailPanel
         position={drilldownLive}
@@ -595,30 +574,6 @@ function PortfolioArc({
   );
 }
 
-function MobileNavButton({
-  icon: Icon,
-  label,
-  active = false,
-}: {
-  icon: ComponentType<{ className?: string }>;
-  label: string;
-  active?: boolean;
-}) {
-  return (
-    <button
-      type="button"
-      className={`flex min-w-0 flex-col items-center justify-center gap-1 rounded-3xl px-1 py-2 text-[11px] font-bold transition-colors ${
-        active
-          ? 'bg-surface-container-high text-primary'
-          : 'text-on-surface hover:text-primary'
-      }`}
-    >
-      <Icon className="h-5 w-5" />
-      <span className="max-w-full truncate">{label}</span>
-    </button>
-  );
-}
-
 function PositionsTable({
   positions,
   isPending,
@@ -743,16 +698,6 @@ function PositionsTable({
 function depotLabel(d: Depot, idx: number): string {
   const t = d.depot_type?.trim();
   return t ? t : `Depot ${idx + 1}`;
-}
-
-function portfolioTitle(
-  depots: Depot[] | undefined,
-  selected: DepotSelection,
-): string {
-  if (!depots || depots.length === 0) return 'Mein Portfolio';
-  if (selected === ALL_DEPOTS) return depots.length > 1 ? 'Alle Portfolios' : depotLabel(depots[0], 0);
-  const idx = depots.findIndex((d) => d.depot_id === selected);
-  return idx >= 0 ? depotLabel(depots[idx], idx) : 'Mein Portfolio';
 }
 
 function portfolioCurrency(

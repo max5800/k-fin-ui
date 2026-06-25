@@ -684,6 +684,7 @@ function portfolioSummary(state: DemoState) {
 
 function portfolioHome(state: DemoState, params: Params) {
   const activityLimit = numberParam(params, 'activity_limit', 5);
+  const range = params.get('range') ?? '1Y';
   const positions = Object.values(state.positionsByDepot).flat();
   const byIsin = new Map(positions.map((p) => [p.instrument.isin, p]));
   const activities = Object.values(state.depotTransactionsByDepot)
@@ -695,9 +696,30 @@ function portfolioHome(state: DemoState, params: Params) {
   return {
     summary: portfolioSummary(state),
     allocation: clone(state.allocation),
-    performance: clone(state.performance),
+    performance: filterPortfolioPerformance(state.performance, range),
     activities,
   };
+}
+
+function filterPortfolioPerformance(
+  series: DemoState['performance'],
+  range: string,
+): DemoState['performance'] {
+  if (range === 'MAX') return clone(series);
+  const days =
+    range === '1D'
+      ? 1
+      : range === '1W'
+      ? 7
+      : range === '1M'
+      ? 31
+      : 365;
+  const latest = series.at(-1)?.snapshot_date;
+  if (!latest) return [];
+  const cutoff = new Date(`${latest}T00:00:00.000Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - days);
+  const cutoffIso = cutoff.toISOString().slice(0, 10);
+  return clone(series.filter((point) => point.snapshot_date >= cutoffIso));
 }
 
 function portfolioActivity(
