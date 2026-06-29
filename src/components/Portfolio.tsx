@@ -12,24 +12,74 @@ import {
 import {
   useAllPositions,
   useDepots,
-  usePortfolioAllocation,
-  usePortfolioPerformance,
-  usePortfolioSummary,
+  usePortfolioHome,
 } from '../api/portfolio';
-import { formatCurrency } from '../lib/format';
-import type { Depot, PerformancePoint, PerformanceRange, Position } from '../api/types';
+import { formatCurrency, formatDate } from '../lib/format';
+import type {
+  Depot,
+  PerformancePoint,
+  PerformanceRange,
+  PortfolioActivity,
+  Position,
+} from '../api/types';
 import PositionDetailPanel from './PositionDetailPanel';
 
 const ALL_DEPOTS = 'all' as const;
 type DepotSelection = typeof ALL_DEPOTS | string;
 
-const RANGES: PerformanceRange[] = ['1D', '1W', '1M', '1Y', 'MAX'];
+const RANGES: { label: string; value: PerformanceRange }[] = [
+  { label: 'Heute', value: '1D' },
+  { label: '7T', value: '1W' },
+  { label: '30T', value: '1M' },
+  { label: '1J', value: '1Y' },
+  { label: 'Max', value: 'MAX' },
+];
 
 const ALLOCATION_COLORS = ['#44d8f1', '#00bcd4', '#f4bd5f', '#869396', '#a1efff'];
 
 function formatPercent(value: number, digits = 1): string {
   const abs = value.toFixed(digits).replace('.', ',');
   return `${abs} %`;
+}
+
+function formatDateShort(value: string): string {
+  return formatDate(value, 'dd.MM.');
+}
+
+function formatActivityType(type: PortfolioActivity['transaction_type']): string {
+  switch (type) {
+    case 'BUY':
+      return 'Kauf';
+    case 'SELL':
+      return 'Verkauf';
+    case 'DIVIDEND':
+      return 'Dividende';
+    default:
+      return 'Aktivität';
+  }
+}
+
+function formatActivityAmount(activity: PortfolioActivity): string {
+  const amount = formatCurrency(Math.abs(activity.amount), activity.currency);
+  switch (activity.transaction_type) {
+    case 'BUY':
+      return amount;
+    case 'SELL':
+    case 'DIVIDEND':
+      return `+${amount}`;
+    default:
+      return activity.amount >= 0 ? `+${amount}` : `-${amount}`;
+  }
+}
+
+function activityAmountClass(activity: PortfolioActivity): string {
+  if (activity.transaction_type === 'DIVIDEND' || activity.transaction_type === 'SELL') {
+    return 'text-primary';
+  }
+  if (activity.transaction_type === 'BUY') {
+    return 'text-on-surface';
+  }
+  return activity.amount >= 0 ? 'text-primary' : 'text-error';
 }
 
 function buildChartPaths(series: PerformancePoint[], width = 800, height = 200) {
@@ -58,9 +108,11 @@ export default function Portfolio() {
   // values immediately without waiting for a re-fetch.
   const [drilldown, setDrilldown] = useState<Position | null>(null);
 
-  const { data: summary, isPending: isSummaryPending } = usePortfolioSummary();
-  const { data: allocation } = usePortfolioAllocation();
-  const { data: performance } = usePortfolioPerformance(range);
+  const { data: home, isPending: isHomePending, isError: isHomeError } = usePortfolioHome(range);
+  const summary = home?.summary;
+  const allocation = home?.allocation;
+  const performance = home?.performance;
+  const activities = home?.activities ?? [];
   const { data: depots } = useDepots();
 
   const { byDepotId, isPending: isPositionsPending } = useAllPositions(depots);
@@ -90,33 +142,99 @@ export default function Portfolio() {
 
   const dailyPositive = (summary?.daily_pnl_abs ?? 0) >= 0;
   const totalPositive = (summary?.total_pnl_abs ?? 0) >= 0;
-
+  const assetClassCount = allocation?.length ?? 0;
+  const currency = summary ? portfolioCurrency(depots, visiblePositions) : 'EUR';
   return (
-    <div className="pt-28 px-8 pb-12 overflow-y-auto h-screen space-y-8">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
+    <div className="pt-24 px-4 md:px-8 pb-28 md:pb-12 overflow-y-auto h-screen space-y-8">
+      <motion.section
+        initial={{ opacity: 0, y: 14 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mx-auto w-full max-w-6xl"
+      >
+        <div className="mb-4 flex items-center gap-3">
+          <div className="w-12 h-12 rounded-full bg-surface-container-low border border-white/10 flex items-center justify-center text-primary">
+            <Wallet className="w-5 h-5" />
+          </div>
+          <div className="min-w-0">
+            <h2 className="truncate font-headline text-2xl font-extrabold text-on-surface">
+              Alle Depots
+            </h2>
+            <p className="text-sm text-on-surface-variant">
+              Home-Kennzahlen und Aktivitäten zeigen das Gesamtportfolio.
+            </p>
+          </div>
+        </div>
+
+        {isHomeError && (
+          <div className="mb-6 rounded-xl border border-error/40 bg-error/10 px-4 py-3 text-sm text-error">
+            Portfolio-Home konnte nicht geladen werden. Bitte Backend-Deployment prüfen.
+          </div>
+        )}
+
+        <div className="flex gap-2 mb-6">
+          <div
+            className="grid flex-1 grid-cols-5 rounded-xl bg-surface-container-high p-1"
+            role="tablist"
+            aria-label="Zeitraum"
+          >
+            {RANGES.map((r) => (
+              <button
+                key={r.value}
+                type="button"
+                onClick={() => setRange(r.value)}
+                className={`h-11 rounded-lg text-sm font-bold transition-colors ${
+                  r.value === range
+                    ? 'bg-surface-container-lowest text-on-surface shadow-sm'
+                    : 'text-on-surface-variant hover:text-on-surface'
+                }`}
+                role="tab"
+                aria-selected={r.value === range}
+              >
+                {r.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="relative overflow-hidden rounded-2xl border border-white/5 bg-surface-container-low px-5 py-8 md:px-10 md:py-10">
+          <div className="mx-auto max-w-3xl">
+            <PortfolioArc
+              value={summary?.total_value ?? 0}
+              pnlAbs={summary?.total_pnl_abs ?? 0}
+              pnlRel={summary?.total_pnl_rel ?? 0}
+              currency={currency}
+              assetClassCount={assetClassCount}
+              positionsCount={summary?.positions_count ?? visiblePositions.length}
+              pending={isHomePending}
+            />
+          </div>
+        </div>
+      </motion.section>
+
+      <section className="mx-auto grid w-full max-w-6xl grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <KpiCard
-          label="Gesamtwert"
-          value={summary ? formatCurrency(summary.total_value) : '—'}
-          hint={summary ? `${summary.positions_count} Positionen` : ''}
+          label="Investiert"
+          value={summary ? formatCurrency(summary.total_purchase_value, currency) : '—'}
+          hint={summary ? `${summary.depots_count} Depot${summary.depots_count === 1 ? '' : 's'}` : ''}
           icon={Wallet}
           tone="neutral"
-          pending={isSummaryPending}
+          pending={isHomePending}
         />
         <KpiCard
           label="G/V Heute"
-          value={summary ? formatCurrency(summary.daily_pnl_abs) : '—'}
+          value={summary ? formatCurrency(summary.daily_pnl_abs, currency) : '—'}
           hint={summary ? formatPercent(summary.daily_pnl_rel, 2) : ''}
           icon={dailyPositive ? ArrowUpRight : ArrowDownRight}
           tone={dailyPositive ? 'primary' : 'danger'}
-          pending={isSummaryPending}
+          pending={isHomePending}
         />
         <KpiCard
-          label="G/V Gesamt"
-          value={summary ? formatCurrency(summary.total_pnl_abs) : '—'}
+          label="Gesamtrendite"
+          value={summary ? formatCurrency(summary.total_pnl_abs, currency) : '—'}
           hint={summary ? formatPercent(summary.total_pnl_rel, 1) : ''}
           icon={LineChart}
           tone={totalPositive ? 'primary' : 'danger'}
-          pending={isSummaryPending}
+          pending={isHomePending}
         />
         <KpiCard
           label="Dividendenrendite"
@@ -124,11 +242,11 @@ export default function Portfolio() {
           hint="Letzte 12 Monate"
           icon={BadgeDollarSign}
           tone="gold"
-          pending={isSummaryPending}
+          pending={isHomePending}
         />
-      </div>
+      </section>
 
-      <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+      <section className="mx-auto grid w-full max-w-6xl grid-cols-1 xl:grid-cols-3 gap-6">
         <motion.div
           initial={{ opacity: 0, x: -16 }}
           animate={{ opacity: 1, x: 0 }}
@@ -139,18 +257,18 @@ export default function Portfolio() {
               <h3 className="text-xl font-headline font-bold text-on-surface">Performance</h3>
               <p className="text-sm text-on-surface-variant">Depotwert im Zeitverlauf</p>
             </div>
-            <div className="flex gap-1 bg-surface-container-high rounded-lg p-1">
+            <div className="hidden sm:flex gap-1 bg-surface-container-high rounded-lg p-1">
               {RANGES.map((r) => (
                 <button
-                  key={r}
-                  onClick={() => setRange(r)}
+                  key={r.value}
+                  onClick={() => setRange(r.value)}
                   className={`px-3 py-1 text-xs font-bold rounded-md transition-colors ${
-                    r === range
+                    r.value === range
                       ? 'bg-primary text-on-primary'
                       : 'text-on-surface-variant hover:text-on-surface'
                   }`}
                 >
-                  {r}
+                  {r.label}
                 </button>
               ))}
             </div>
@@ -222,12 +340,12 @@ export default function Portfolio() {
             </p>
           )}
         </motion.div>
-      </div>
+      </section>
 
       <motion.div
         initial={{ opacity: 0, y: 16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="bg-surface-container-low rounded-2xl border border-white/5 overflow-hidden"
+        className="mx-auto w-full max-w-6xl bg-surface-container-low rounded-2xl border border-white/5 overflow-hidden"
       >
         <div className="p-6 border-b border-white/5 flex justify-between items-center">
           <div>
@@ -257,6 +375,54 @@ export default function Portfolio() {
           }
         />
       </motion.div>
+
+      <motion.section
+        aria-labelledby="portfolio-activities-heading"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="mx-auto w-full max-w-6xl rounded-2xl border border-white/5 bg-surface-container-low p-6"
+      >
+        <div className="mb-5">
+          <h3
+            id="portfolio-activities-heading"
+            className="font-headline font-bold text-on-surface text-xl"
+          >
+            Deine Aktivitäten
+          </h3>
+          <p className="text-xs text-on-surface-variant">
+            Letzte Depotbewegungen aus Käufen, Verkäufen und Dividenden.
+          </p>
+        </div>
+        {activities.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+            {activities.slice(0, 3).map((activity) => (
+              <div
+                key={activity.transaction_id}
+                className="text-left rounded-xl bg-surface-container p-4 border border-white/5 hover:border-primary/40 transition-colors"
+              >
+                <p className="text-xs text-on-surface-variant mb-2">
+                  {formatActivityType(activity.transaction_type)}
+                </p>
+                <p className="font-headline font-bold text-on-surface truncate">
+                  {activity.instrument_name || activity.isin || 'Depotbewegung'}
+                </p>
+                <p
+                  className={`mt-3 font-headline font-extrabold tabular-nums ${activityAmountClass(activity)}`}
+                >
+                  {formatActivityAmount(activity)}
+                </p>
+                <p className="mt-2 text-xs text-on-surface-variant">
+                  {formatDateShort(activity.booking_date)}
+                </p>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="py-8 text-center text-sm text-on-surface-variant">
+            Noch keine Portfolio-Aktivitäten. Nach dem nächsten Sync erscheinen Bewegungen hier.
+          </p>
+        )}
+      </motion.section>
 
       <PositionDetailPanel
         position={drilldownLive}
@@ -322,6 +488,89 @@ function KpiCard({ label, value, hint, icon: Icon, tone, pending }: KpiCardProps
       )}
       <p className="text-xs mt-2 text-on-surface-variant font-medium">{hint}</p>
     </motion.div>
+  );
+}
+
+function PortfolioArc({
+  value,
+  pnlAbs,
+  pnlRel,
+  currency,
+  assetClassCount,
+  positionsCount,
+  pending,
+}: {
+  value: number;
+  pnlAbs: number;
+  pnlRel: number;
+  currency: string;
+  assetClassCount: number;
+  positionsCount: number;
+  pending: boolean;
+}) {
+  const positive = pnlAbs >= 0;
+  const pnlIntensity = Math.min(Math.max(Math.abs(pnlRel) / 30, 0.08), 1);
+  const circumference = 314;
+  const strokeDashoffset = circumference * (1 - pnlIntensity);
+
+  return (
+    <div className="relative mx-auto flex aspect-[1.45/1] w-full max-w-[42rem] items-end justify-center">
+      <svg
+        className="absolute inset-x-0 bottom-0 h-full w-full"
+        viewBox="0 0 420 240"
+        role="img"
+        aria-label="Portfolio Performance"
+      >
+        <path
+          d="M40 210 A170 170 0 0 1 380 210"
+          fill="none"
+          stroke="#273452"
+          strokeLinecap="butt"
+          strokeWidth="34"
+        />
+        <path
+          d="M40 210 A170 170 0 0 1 380 210"
+          fill="none"
+          stroke={positive ? '#44d8f1' : '#ffb4ab'}
+          strokeDasharray={circumference}
+          strokeDashoffset={strokeDashoffset}
+          strokeLinecap="butt"
+          strokeWidth="34"
+        />
+      </svg>
+
+      <div className="relative z-10 mb-4 flex w-full max-w-md flex-col items-center px-4 text-center">
+        {pending ? (
+          <div className="mb-4 h-12 w-44 animate-pulse rounded-xl bg-white/5" />
+        ) : (
+          <p className="mb-3 break-words text-4xl font-headline font-extrabold tabular-nums text-on-surface md:text-5xl">
+            {formatCurrency(value, currency)}
+          </p>
+        )}
+        <div className="mb-4 h-px w-full max-w-xs bg-white/10" />
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          <span
+            className={`rounded-lg px-3 py-1 text-sm font-headline font-bold tabular-nums ${
+              positive ? 'bg-primary/15 text-primary' : 'bg-error/15 text-error'
+            }`}
+          >
+            {pnlAbs >= 0 ? '+' : ''}
+            {formatCurrency(pnlAbs, currency)}
+          </span>
+          <span
+            className={`rounded-lg px-3 py-1 text-sm font-headline font-bold tabular-nums ${
+              positive ? 'bg-primary/15 text-primary' : 'bg-error/15 text-error'
+            }`}
+          >
+            {pnlRel >= 0 ? '+' : ''}
+            {formatPercent(pnlRel, 2)}
+          </span>
+        </div>
+        <p className="mt-5 text-sm text-on-surface-variant">
+          {assetClassCount} Assetklassen • {positionsCount} Holdings • {currency}
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -449,6 +698,14 @@ function PositionsTable({
 function depotLabel(d: Depot, idx: number): string {
   const t = d.depot_type?.trim();
   return t ? t : `Depot ${idx + 1}`;
+}
+
+function portfolioCurrency(
+  depots: Depot[] | undefined,
+  positions: Position[],
+): string {
+  const depotCurrency = depots?.find((d) => d.currency)?.currency;
+  return depotCurrency ?? positions.find((p) => p.currency)?.currency ?? 'EUR';
 }
 
 function bestandslisteSubtitle(

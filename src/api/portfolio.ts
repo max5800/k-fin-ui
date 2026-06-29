@@ -8,12 +8,25 @@ import type {
   Instrument,
   InstrumentPricePoint,
   PaginatedResponse,
+  PortfolioHome,
   PerformancePoint,
   PerformanceRange,
   PortfolioSummary,
   Position,
   PriceBackfillResult,
 } from './types';
+
+export function usePortfolioHome(range: PerformanceRange) {
+  return useQuery({
+    queryKey: qk.portfolio.home(range),
+    queryFn: async () => {
+      const { data } = await apiClient.get<PortfolioHome>('/portfolio/home', {
+        params: { range, activity_limit: 5 },
+      });
+      return data;
+    },
+  });
+}
 
 export function usePortfolioSummary() {
   return useQuery({
