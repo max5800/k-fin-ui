@@ -1,3 +1,10 @@
+# [1.22.0](https://github.com/max5800/k-fin-ui/compare/v1.21.0...v1.22.0) (2026-06-29)
+
+
+### Features
+
+* add Parqet-inspired portfolio home ([1390c67](https://github.com/max5800/k-fin-ui/commit/1390c6725b21247f93a9e1f5e9d4964f726dd3ce))
+
 # [1.21.0](https://github.com/max5800/k-fin-ui/compare/v1.20.1...v1.21.0) (2026-06-01)
 
 
